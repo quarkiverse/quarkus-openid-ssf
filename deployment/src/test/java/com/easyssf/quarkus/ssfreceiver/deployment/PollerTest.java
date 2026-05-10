@@ -47,6 +47,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 import com.easyssf.quarkus.ssfreceiver.runtime.delivery.poll.SsfPoller;
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventHandler;
+import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventContext;
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventToken;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.WireMock;
@@ -371,12 +372,12 @@ public class PollerTest {
         final java.util.concurrent.atomic.AtomicBoolean throwOnNext = new java.util.concurrent.atomic.AtomicBoolean(false);
 
         @Override
-        public void handle(SsfEventToken eventToken) {
+        public void handle(SsfEventContext eventContext) {
             invocations.incrementAndGet();
             if (throwOnNext.compareAndSet(true, false)) {
                 throw new RuntimeException("CapturingHandler intentionally throws");
             }
-            captured.add(eventToken);
+            captured.add(eventContext.eventToken());
         }
 
         void reset() {

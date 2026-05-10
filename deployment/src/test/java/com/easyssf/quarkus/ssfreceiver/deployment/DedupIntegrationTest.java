@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventHandler;
-import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventToken;
+import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventContext;
 
 import io.quarkus.test.QuarkusExtensionTest;
 import io.restassured.RestAssured;
@@ -120,7 +120,7 @@ public class DedupIntegrationTest {
         final AtomicInteger invocations = new AtomicInteger();
 
         @Override
-        public void handle(SsfEventToken eventToken) {
+        public void handle(SsfEventContext eventContext) {
             invocations.incrementAndGet();
             firstInvocation.countDown();
         }

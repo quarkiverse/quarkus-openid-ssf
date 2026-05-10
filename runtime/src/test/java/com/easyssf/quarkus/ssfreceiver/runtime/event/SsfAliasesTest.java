@@ -83,6 +83,41 @@ class SsfAliasesTest {
         }
 
         @Test
+        @DisplayName("Built-in CAEP-1.0 aliases are registered")
+        void caepBuiltInsAreRegistered() {
+            SsfAliases aliases = newAliases(configWith(
+                    Collections.emptyMap(), Collections.emptyMap(),
+                    Optional.empty(), Optional.empty()));
+
+            assertThat(aliases.eventTypeAlias(SESSION_REVOKED_URI),
+                    equalTo("CaepSessionRevoked"));
+            assertThat(aliases.eventTypeAlias(
+                    "https://schemas.openid.net/secevent/caep/event-type/credential-change"),
+                    equalTo("CaepCredentialChange"));
+            assertThat(aliases.eventTypeAlias(
+                    "https://schemas.openid.net/secevent/caep/event-type/risk-level-change"),
+                    equalTo("CaepRiskLevelChange"));
+        }
+
+        @Test
+        @DisplayName("Built-in RISC-1.0 aliases are registered")
+        void riscBuiltInsAreRegistered() {
+            SsfAliases aliases = newAliases(configWith(
+                    Collections.emptyMap(), Collections.emptyMap(),
+                    Optional.empty(), Optional.empty()));
+
+            assertThat(aliases.eventTypeAlias(
+                    "https://schemas.openid.net/secevent/risc/event-type/account-purged"),
+                    equalTo("RiscAccountPurged"));
+            assertThat(aliases.eventTypeAlias(
+                    "https://schemas.openid.net/secevent/risc/event-type/credential-compromise"),
+                    equalTo("RiscCredentialCompromise"));
+            assertThat(aliases.eventTypeAlias(
+                    "https://schemas.openid.net/secevent/risc/event-type/opt-out-effective"),
+                    equalTo("RiscOptOutEffective"));
+        }
+
+        @Test
         @DisplayName("Consumer config adds new aliases on top of built-ins")
         void consumerConfigOverlaysBuiltIns() {
             Map<String, URI> userAliases = new LinkedHashMap<>();
@@ -138,9 +173,12 @@ class SsfAliasesTest {
         @Test
         @DisplayName("Entries with null alias / null URI are silently skipped")
         void invalidEntriesSkipped() {
+            // Use a URI that has NO built-in alias so the passthrough is
+            // observable. (session-revoked is now a CAEP-spec built-in.)
+            String customUri = "https://example.org/custom/event-type/foo";
             // LinkedHashMap accepts null keys; the bean must not NPE on them.
             Map<String, URI> userAliases = new LinkedHashMap<>();
-            userAliases.put(null, URI.create(SESSION_REVOKED_URI));
+            userAliases.put(null, URI.create(customUri));
             userAliases.put("BlankKey", null);
 
             SsfAliases aliases = newAliases(configWith(
@@ -148,7 +186,7 @@ class SsfAliasesTest {
                     Optional.empty(), Optional.empty()));
 
             // Falls through to the URI itself — neither entry registered.
-            assertThat(aliases.eventTypeAlias(SESSION_REVOKED_URI), equalTo(SESSION_REVOKED_URI));
+            assertThat(aliases.eventTypeAlias(customUri), equalTo(customUri));
         }
 
         @Test

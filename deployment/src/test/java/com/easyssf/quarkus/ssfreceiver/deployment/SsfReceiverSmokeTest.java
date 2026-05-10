@@ -40,6 +40,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventHandler;
+import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventContext;
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventToken;
 import com.easyssf.quarkus.ssfreceiver.runtime.metadata.SsfConfigurationResolver;
 import com.easyssf.quarkus.ssfreceiver.runtime.metadata.SsfTransmitterMetadata;
@@ -205,8 +206,8 @@ public class SsfReceiverSmokeTest {
         final AtomicInteger invocations = new AtomicInteger();
 
         @Override
-        public void handle(SsfEventToken eventToken) {
-            last.set(eventToken);
+        public void handle(SsfEventContext eventContext) {
+            last.set(eventContext.eventToken());
             invocations.incrementAndGet();
             latch.countDown();
         }

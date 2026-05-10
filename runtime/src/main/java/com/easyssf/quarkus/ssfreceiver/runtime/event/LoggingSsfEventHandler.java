@@ -15,11 +15,7 @@
  */
 package com.easyssf.quarkus.ssfreceiver.runtime.event;
 
-import java.util.List;
-import java.util.Map;
-
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 
 import org.jboss.logging.Logger;
 
@@ -31,22 +27,13 @@ public class LoggingSsfEventHandler implements SsfEventHandler {
 
     private static final Logger LOG = Logger.getLogger(LoggingSsfEventHandler.class);
 
-    @Inject
-    SsfAliases aliases;
-
     @Override
-    public void handle(SsfEventToken eventToken) {
+    public void handle(SsfEventContext eventContext) {
+        SsfEventToken eventToken = eventContext.eventToken();
         LOG.infof("SSF event received jti=%s iss=%s iat=%s events=%s",
                 eventToken.jti(),
-                aliases.issuerAlias(eventToken.iss()),
+                eventContext.issAlias(),
                 eventToken.iat(),
-                eventTypeAliases(eventToken.events()));
-    }
-
-    private List<String> eventTypeAliases(Map<String, Object> events) {
-        if (events == null || events.isEmpty()) {
-            return List.of();
-        }
-        return events.keySet().stream().map(aliases::eventTypeAlias).toList();
+                eventContext.eventsByAlias().keySet());
     }
 }

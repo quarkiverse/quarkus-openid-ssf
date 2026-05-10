@@ -53,14 +53,24 @@ Provide a CDI bean implementing `SsfEventHandler`:
 @ApplicationScoped
 public class MyHandler implements SsfEventHandler {
     @Override
-    public void handle(SsfEventToken eventToken) {
-        // RFC 8417 + SSF profile fields:
+    public void handle(SsfEventContext eventContext) {
+        SsfEventToken eventToken = eventContext.eventToken();
+        // Raw RFC 8417 + SSF profile fields on the token:
         //   eventToken.jti(), eventToken.iss(), eventToken.iat()
         //   eventToken.aud()                 — always List<String>, even single-aud SETs
         //   eventToken.events()              — Map<eventTypeURI, payload> (RFC 8417 §2.2)
         //   eventToken.subjectId()           — sub_id object
         //   eventToken.txn()                 — transaction id, may be null
         //   eventToken.additionalProperties()— any unmodelled / future claims
+
+        // Alias-aware convenience on the context — accepts either an alias
+        // or the full URI, so handler code stays correct regardless of
+        // whether aliases are configured. Built-in aliases cover SSF, CAEP,
+        // and RISC spec event types out of the box (CaepSessionRevoked,
+        // RiscAccountDisabled, …).
+        if (eventContext.hasEvent("CaepSessionRevoked")) { /* … */ }
+        Map<String, Object> payload = eventContext.eventFor("CaepCredentialChange");
+        String issAlias = eventContext.issAlias();
     }
 }
 ```
@@ -177,23 +187,19 @@ stand-alone — pick whichever matches your use case and copy.
 @ApplicationScoped
 public class SessionRevocationHandler implements SsfEventHandler {
 
-    private static final String SESSION_REVOKED =
-            "https://schemas.openid.net/secevent/caep/event-type/session-revoked";
-    private static final String CREDENTIAL_CHANGE =
-            "https://schemas.openid.net/secevent/caep/event-type/credential-change";
-
     @Inject SessionStore sessions;
     @Inject TokenCache tokens;
 
     @Override
-    public void handle(SsfEventToken eventToken) {
-        String subjectId = (String) eventToken.subjectId().get("sub");
+    public void handle(SsfEventContext eventContext) {
+        String subjectId = (String) eventContext.eventToken().subjectId().get("sub");
         if (subjectId == null) return;
 
-        if (eventToken.events().containsKey(SESSION_REVOKED)) {
+        // CAEP aliases are built-in — no constants, no configuration needed.
+        if (eventContext.hasEvent("CaepSessionRevoked")) {
             sessions.invalidateAllFor(subjectId);
         }
-        if (eventToken.events().containsKey(CREDENTIAL_CHANGE)) {
+        if (eventContext.hasEvent("CaepCredentialChange")) {
             tokens.invalidateAllFor(subjectId);
             sessions.requireReauthFor(subjectId);
         }
@@ -226,19 +232,20 @@ ssf.receiver.push.expected-auth-header=Bearer ${PUSH_SHARED_SECRET}
 public class KafkaForwarder implements SsfEventHandler {
 
     @Inject @Channel("ssf-events") Emitter<String> producer;
-    @Inject SsfAliases aliases;
     @Inject ObjectMapper json;
 
     @Override
-    public void handle(SsfEventToken eventToken) {
+    public void handle(SsfEventContext eventContext) {
         // Forward the verified token + the alias-resolved issuer so downstream
         // consumers don't have to reproduce the alias lookup.
+        SsfEventToken eventToken = eventContext.eventToken();
         Map<String, Object> payload = Map.of(
                 "jti", eventToken.jti(),
                 "iss", eventToken.iss(),
-                "issAlias", aliases.issuerAlias(eventToken.iss()),
+                "issAlias", eventContext.issAlias(),
                 "iat", eventToken.iat().toString(),
                 "events", eventToken.events(),
+                "eventsByAlias", eventContext.eventsByAlias(),
                 "subjectId", eventToken.subjectId(),
                 "additionalProperties", eventToken.additionalProperties());
         try {
@@ -293,18 +300,13 @@ public class JdbcSsfPollAckStore implements SsfPollAckStore {
 @ApplicationScoped
 public class StepUpTrigger implements SsfEventHandler {
 
-    private static final String ASSURANCE_LEVEL_CHANGE =
-            "https://schemas.openid.net/secevent/caep/event-type/assurance-level-change";
-    private static final String DEVICE_COMPLIANCE =
-            "https://schemas.openid.net/secevent/caep/event-type/device-compliance-change";
-
     @Inject SubjectFlags flags;
 
     @Override
-    public void handle(SsfEventToken eventToken) {
-        if (eventToken.events().containsKey(ASSURANCE_LEVEL_CHANGE)
-                || eventToken.events().containsKey(DEVICE_COMPLIANCE)) {
-            String sub = (String) eventToken.subjectId().get("sub");
+    public void handle(SsfEventContext eventContext) {
+        if (eventContext.hasEvent("CaepAssuranceLevelChange")
+                || eventContext.hasEvent("CaepDeviceComplianceChange")) {
+            String sub = (String) eventContext.eventToken().subjectId().get("sub");
             if (sub != null) {
                 flags.markRequiresStepUp(sub, Duration.ofMinutes(15));
             }
@@ -519,9 +521,16 @@ ssf.receiver.issuer-aliases.MyTransmitter=https://transmitter.example
 ssf.receiver.alias=my-receiver
 ```
 
-Built-in event-type aliases:
-- `…/secevent/ssf/event-type/verification` → `SsfStreamVerification`
-- `…/secevent/ssf/event-type/stream-updated` → `SsfStreamUpdated`
+**Built-in event-type aliases** (covered out of the box, no config needed):
+
+| Spec | URIs of the form `…/secevent/<spec>/event-type/<name>` | Aliases |
+|---|---|---|
+| **OpenID SSF** | `verification`, `stream-updated` | `SsfStreamVerification`, `SsfStreamUpdated` |
+| **OpenID CAEP 1.0** | `session-revoked`, `token-claims-change`, `credential-change`, `assurance-level-change`, `device-compliance-change`, `session-established`, `session-presented`, `risk-level-change` | `CaepSessionRevoked`, `CaepTokenClaimsChange`, `CaepCredentialChange`, `CaepAssuranceLevelChange`, `CaepDeviceComplianceChange`, `CaepSessionEstablished`, `CaepSessionPresented`, `CaepRiskLevelChange` |
+| **OpenID RISC 1.0** | `account-credential-change-required`, `account-purged`, `account-disabled`, `account-enabled`, `identifier-changed`, `identifier-recycled`, `credential-compromise`, `opt-in`, `opt-out-initiated`, `opt-out-cancelled`, `opt-out-effective`, `recovery-activated`, `recovery-information-changed` | `RiscAccountCredentialChangeRequired`, `RiscAccountPurged`, `RiscAccountDisabled`, `RiscAccountEnabled`, `RiscIdentifierChanged`, `RiscIdentifierRecycled`, `RiscCredentialCompromise`, `RiscOptIn`, `RiscOptOutInitiated`, `RiscOptOutCancelled`, `RiscOptOutEffective`, `RiscRecoveryActivated`, `RiscRecoveryInformationChanged` |
+
+Consumer entries in `ssf.receiver.event-aliases.*` overlay the built-ins —
+a user mapping for a built-in URI replaces the alias.
 
 `SsfAliases` is a regular CDI bean — `@Inject` it into your own resources / log
 lines / handlers if you want the same naming outside metrics. Unknown URIs

@@ -38,6 +38,8 @@ import com.easyssf.quarkus.ssfreceiver.runtime.auth.TransmitterTokenProvider;
 import com.easyssf.quarkus.ssfreceiver.runtime.dedup.SsfJtiDedupStore;
 import com.easyssf.quarkus.ssfreceiver.runtime.delivery.push.SetVerifier;
 import com.easyssf.quarkus.ssfreceiver.runtime.delivery.push.SsfVerificationException;
+import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfAliases;
+import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventContext;
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventHandler;
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventToken;
 import com.easyssf.quarkus.ssfreceiver.runtime.metrics.SsfReceiverMetrics;
@@ -96,6 +98,9 @@ public class SsfPoller {
 
     @Inject
     SsfReceiverMetrics metrics;
+
+    @Inject
+    SsfAliases aliases;
 
     @Inject
     Vertx vertx;
@@ -285,7 +290,7 @@ public class SsfPoller {
                 continue;
             }
             try {
-                handler.handle(event);
+                handler.handle(SsfEventContext.of(event, aliases));
                 ackStore.enqueueAck(event.jti() != null ? event.jti() : jti);
                 metrics.pollEventHandled();
                 if (event.events() != null) {

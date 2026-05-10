@@ -26,7 +26,7 @@ import org.jboss.logging.Logger;
 
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfAliases;
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventHandler;
-import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventToken;
+import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventContext;
 
 @ApplicationScoped
 public class CapturingSsfEventHandler implements SsfEventHandler {
@@ -41,8 +41,8 @@ public class CapturingSsfEventHandler implements SsfEventHandler {
     SsfAliases aliases;
 
     @Override
-    public void handle(SsfEventToken eventToken) {
-        CapturedEvent captured = CapturedEvent.of(eventToken, aliases);
+    public void handle(SsfEventContext eventContext) {
+        CapturedEvent captured = CapturedEvent.of(eventContext.eventToken(), aliases);
         LOG.infof("Captured SSF event jti=%s iss=%s iat=%s aud=%s txn=%s subjectId=%s events=%s",
                 captured.jti(),
                 captured.issAlias(),

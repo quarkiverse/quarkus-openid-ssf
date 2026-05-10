@@ -28,6 +28,8 @@ import org.jboss.logging.Logger;
 
 import com.easyssf.quarkus.ssfreceiver.runtime.SsfReceiverConfig;
 import com.easyssf.quarkus.ssfreceiver.runtime.dedup.SsfJtiDedupStore;
+import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfAliases;
+import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventContext;
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventHandler;
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventToken;
 import com.easyssf.quarkus.ssfreceiver.runtime.metrics.SsfReceiverMetrics;
@@ -57,6 +59,9 @@ public class SsfPushRoute {
 
     @Inject
     SsfJtiDedupStore dedupStore;
+
+    @Inject
+    SsfAliases aliases;
 
     private final ExecutorService dispatchExecutor = Executors.newThreadPerTaskExecutor(virtualThreadFactory());
 
@@ -126,11 +131,16 @@ public class SsfPushRoute {
 
         recordEventTypes(event);
 
+        // Build the alias-resolved view once, so the handler's hasEvent / payloadFor
+        // calls are O(1) and the configured aliases are visible without each handler
+        // having to inject SsfAliases itself.
+        SsfEventContext eventContext = SsfEventContext.of(event, aliases);
+
         // SET has been accepted; dispatch handler asynchronously so handler exceptions
         // don't turn the response into a 5xx.
         dispatchExecutor.execute(() -> {
             try {
-                handler.handle(event);
+                handler.handle(eventContext);
             } catch (RuntimeException e) {
                 metrics.pushHandlerError();
                 LOG.errorf(e, "SsfEventHandler threw for jti=%s", event.jti());

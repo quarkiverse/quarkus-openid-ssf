@@ -34,8 +34,8 @@ import com.easyssf.quarkus.ssfreceiver.runtime.SsfReceiverConfig;
  * <p>
  * Three independent alias domains:
  * <ul>
- * <li><b>Event types</b> — built-in defaults for the SSF spec event types,
- * overridable via {@code ssf.receiver.event-aliases.<alias>=<uri>}.</li>
+ * <li><b>Event types</b> — built-in defaults for SSF, CAEP, and RISC spec
+ * event types, overridable via {@code ssf.receiver.event-aliases.<alias>=<uri>}.</li>
  * <li><b>Issuers</b> — no defaults; configured via
  * {@code ssf.receiver.issuer-aliases.<alias>=<url>}.</li>
  * <li><b>This receiver</b> — single string via {@code ssf.receiver.alias},
@@ -43,23 +43,55 @@ import com.easyssf.quarkus.ssfreceiver.runtime.SsfReceiverConfig;
  * </ul>
  *
  * <p>
- * Built-in event-type aliases:
- * <ul>
- * <li>{@code https://schemas.openid.net/secevent/ssf/event-type/verification}
- * → {@code SsfStreamVerification}</li>
- * <li>{@code https://schemas.openid.net/secevent/ssf/event-type/stream-updated}
- * → {@code SsfStreamUpdated}</li>
- * </ul>
+ * Built-in event-type aliases cover the OpenID SSF, CAEP-1.0, and RISC-1.0
+ * event types — see the constants below. Consumers can override any of them
+ * by registering their own alias for the same URI.
  */
 @ApplicationScoped
 public class SsfAliases {
 
     private static final String UNKNOWN = "unknown";
 
-    /** Built-in aliases for SSF spec event types; always registered. */
-    private static final Map<String, String> BUILT_IN_EVENT_ALIASES = Map.of(
-            "https://schemas.openid.net/secevent/ssf/event-type/verification", "SsfStreamVerification",
-            "https://schemas.openid.net/secevent/ssf/event-type/stream-updated", "SsfStreamUpdated");
+    private static final String SSF_BASE = "https://schemas.openid.net/secevent/ssf/event-type/";
+    private static final String CAEP_BASE = "https://schemas.openid.net/secevent/caep/event-type/";
+    private static final String RISC_BASE = "https://schemas.openid.net/secevent/risc/event-type/";
+
+    /**
+     * Built-in aliases for SSF, CAEP, and RISC spec event types; always
+     * registered. Consumer entries in {@code ssf.receiver.event-aliases.*}
+     * overlay these — a user mapping for a built-in URI replaces the alias.
+     */
+    private static final Map<String, String> BUILT_IN_EVENT_ALIASES;
+    static {
+        Map<String, String> m = new java.util.LinkedHashMap<>();
+        // OpenID SSF — stream lifecycle events.
+        m.put(SSF_BASE + "verification", "SsfStreamVerification");
+        m.put(SSF_BASE + "stream-updated", "SsfStreamUpdated");
+        // OpenID CAEP 1.0 — see https://openid.net/specs/openid-caep-1_0-final.html
+        m.put(CAEP_BASE + "session-revoked", "CaepSessionRevoked");
+        m.put(CAEP_BASE + "token-claims-change", "CaepTokenClaimsChange");
+        m.put(CAEP_BASE + "credential-change", "CaepCredentialChange");
+        m.put(CAEP_BASE + "assurance-level-change", "CaepAssuranceLevelChange");
+        m.put(CAEP_BASE + "device-compliance-change", "CaepDeviceComplianceChange");
+        m.put(CAEP_BASE + "session-established", "CaepSessionEstablished");
+        m.put(CAEP_BASE + "session-presented", "CaepSessionPresented");
+        m.put(CAEP_BASE + "risk-level-change", "CaepRiskLevelChange");
+        // OpenID RISC 1.0 — see https://openid.net/specs/openid-risc-1_0-final.html
+        m.put(RISC_BASE + "account-credential-change-required", "RiscAccountCredentialChangeRequired");
+        m.put(RISC_BASE + "account-purged", "RiscAccountPurged");
+        m.put(RISC_BASE + "account-disabled", "RiscAccountDisabled");
+        m.put(RISC_BASE + "account-enabled", "RiscAccountEnabled");
+        m.put(RISC_BASE + "identifier-changed", "RiscIdentifierChanged");
+        m.put(RISC_BASE + "identifier-recycled", "RiscIdentifierRecycled");
+        m.put(RISC_BASE + "credential-compromise", "RiscCredentialCompromise");
+        m.put(RISC_BASE + "opt-in", "RiscOptIn");
+        m.put(RISC_BASE + "opt-out-initiated", "RiscOptOutInitiated");
+        m.put(RISC_BASE + "opt-out-cancelled", "RiscOptOutCancelled");
+        m.put(RISC_BASE + "opt-out-effective", "RiscOptOutEffective");
+        m.put(RISC_BASE + "recovery-activated", "RiscRecoveryActivated");
+        m.put(RISC_BASE + "recovery-information-changed", "RiscRecoveryInformationChanged");
+        BUILT_IN_EVENT_ALIASES = Collections.unmodifiableMap(m);
+    }
 
     @Inject
     SsfReceiverConfig config;
