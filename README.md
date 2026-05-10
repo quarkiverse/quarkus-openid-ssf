@@ -6,8 +6,11 @@
 
 A Quarkus extension that lets a Quarkus app act as a [Shared Signals Framework
 (SSF)](https://openid.net/specs/openid-sharedsignals-framework-1_0.html)
-receiver against any compliant SSF transmitter (Keycloak, [caep.dev](https://ssf.caep.dev),
-custom).
+receiver against any spec-compliant SSF transmitter — public providers like
+[caep.dev](https://ssf.caep.dev), on-prem / self-hosted IdPs, or custom
+implementations. Outbound auth is OAuth2-based (`client_credentials` via
+`quarkus-oidc-client`, or a long-lived bearer token), so anything that issues
+OAuth2 access tokens fits.
 
 | | |
 |---|---|
@@ -39,8 +42,8 @@ custom).
 |---|---|
 | [`runtime/`](runtime/) | Extension runtime: config mapping, `SsfEventHandler` SPI, JWKS resolver, SET verifier, push route, POLL scheduler, stream client, alias resolver, metrics SPI. |
 | [`deployment/`](deployment/) | Build-time processor — registers beans + REST clients, picks the right `TransmitterTokenProvider` at build time, wires Micrometer when present. Also contains the smoke test (signed SET round-trip with a stub JWKS). |
-| [`examples/example-transmitter-managed-stream/`](examples/example-transmitter-managed-stream/) | Runnable Quarkus app — TRANSMITTER mode + PUSH delivery, env-var-driven (Keycloak by default). |
-| [`examples/example-receiver-managed-stream/`](examples/example-receiver-managed-stream/) | Runnable Quarkus app — RECEIVER mode. Default config is neutral; `-Dquarkus.profile=caepdev` overlays caep.dev (PUSH), `-Dquarkus.profile=keycloak` overlays Keycloak (POLL + OIDC). |
+| [`examples/example-transmitter-managed-stream/`](examples/example-transmitter-managed-stream/) | Runnable Quarkus app — TRANSMITTER mode + PUSH delivery, env-var-driven, OIDC `client_credentials` for outbound auth. |
+| [`examples/example-receiver-managed-stream/`](examples/example-receiver-managed-stream/) | Runnable Quarkus app — RECEIVER mode. Default config is neutral; the `caepdev` profile overlays caep.dev (PUSH + static token), the `keycloak` profile overlays an OIDC + POLL setup. |
 
 ## Consumer SPI
 
@@ -70,9 +73,9 @@ event-type aliases at INFO.
 ### Transmitter-managed (operator owns the stream)
 
 ```properties
-ssf.receiver.transmitter-issuer=https://kc.example/realms/r1
+ssf.receiver.transmitter-issuer=https://transmitter.example
 ssf.receiver.stream-management=TRANSMITTER
-ssf.receiver.stream-id=<from Keycloak admin>
+ssf.receiver.stream-id=<from the transmitter's admin / onboarding flow>
 ssf.receiver.delivery-method=PUSH
 ssf.receiver.push.expected-auth-header=Bearer <shared-secret>   # optional
 ```
@@ -80,7 +83,7 @@ ssf.receiver.push.expected-auth-header=Bearer <shared-secret>   # optional
 ### Receiver-managed (extension creates / rediscovers the stream)
 
 ```properties
-ssf.receiver.transmitter-issuer=https://kc.example/realms/r1
+ssf.receiver.transmitter-issuer=https://transmitter.example
 ssf.receiver.stream-management=RECEIVER
 ssf.receiver.delivery-method=PUSH                               # or POLL
 ssf.receiver.push.delivery-endpoint-url=https://my-app.example/ssf/push
@@ -103,9 +106,9 @@ stand-alone — pick whichever matches your use case and copy.
 
 ### 1 · Session / cache invalidator
 
-> "I'm a backend that authenticates users via Keycloak. When the IdP revokes
-> a session or rotates credentials, I need to drop my local sessions and
-> tokens so the user can't continue with stale state."
+> "I'm a backend that authenticates users via an OIDC IdP. When the IdP
+> revokes a session or rotates credentials, I need to drop my local sessions
+> and tokens so the user can't continue with stale state."
 
 ```java
 @ApplicationScoped
@@ -136,16 +139,16 @@ public class SessionRevocationHandler implements SsfEventHandler {
 ```
 
 ```properties
-ssf.receiver.transmitter-issuer=https://kc.example/realms/r1
+ssf.receiver.transmitter-issuer=https://transmitter.example
 ssf.receiver.stream-management=TRANSMITTER
-ssf.receiver.stream-id=<from Keycloak admin>
+ssf.receiver.stream-id=<from the transmitter's admin / onboarding flow>
 ssf.receiver.delivery-method=PUSH
 ssf.receiver.expected-audience=https://my-app.example
 ssf.receiver.push.expected-auth-header=Bearer ${PUSH_SHARED_SECRET}
 ```
 
 **Key points:**
-- TRANSMITTER-managed: simplest setup, operator creates the stream in Keycloak admin.
+- TRANSMITTER-managed: simplest setup, operator creates the stream in the transmitter's admin console.
 - PUSH delivery: lowest latency, requires the receiver to be reachable from the transmitter.
 - The handler is **idempotent** by construction — invalidating an already-invalid session is a no-op. That's important because the extension's built-in `jti` dedup is best-effort across restarts (it's in-memory by default).
 
@@ -185,7 +188,7 @@ public class KafkaForwarder implements SsfEventHandler {
 ```
 
 ```properties
-ssf.receiver.transmitter-issuer=https://kc.example/realms/r1
+ssf.receiver.transmitter-issuer=https://transmitter.example
 ssf.receiver.stream-management=RECEIVER
 ssf.receiver.delivery-method=POLL
 ssf.receiver.alias=audit-hub-prod-eu
@@ -446,7 +449,7 @@ ssf.receiver.event-aliases.CaepCredentialChange=https://schemas.openid.net/secev
 
 # Transmitter issuer URL → short alias (no built-ins)
 ssf.receiver.issuer-aliases.CaepDev=https://ssf.caep.dev
-ssf.receiver.issuer-aliases.KeycloakRealm=https://kc.example/realms/r1
+ssf.receiver.issuer-aliases.MyTransmitter=https://transmitter.example
 
 # This receiver's own short name — surfaces as the `receiver` tag.
 # Falls back to expected-audience, then "unknown".
