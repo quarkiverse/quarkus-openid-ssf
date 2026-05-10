@@ -41,8 +41,8 @@ public class CapturingSsfEventHandler implements SsfEventHandler {
     SsfAliases aliases;
 
     @Override
-    public void handle(SsfEventToken event) {
-        CapturedEvent captured = CapturedEvent.of(event, aliases);
+    public void handle(SsfEventToken eventToken) {
+        CapturedEvent captured = CapturedEvent.of(eventToken, aliases);
         LOG.infof("Captured SSF event jti=%s iss=%s iat=%s aud=%s txn=%s subjectId=%s payloads=%s",
                 captured.jti(),
                 captured.issAlias(),

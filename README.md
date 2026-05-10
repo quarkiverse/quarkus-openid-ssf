@@ -53,14 +53,14 @@ Provide a CDI bean implementing `SsfEventHandler`:
 @ApplicationScoped
 public class MyHandler implements SsfEventHandler {
     @Override
-    public void handle(SsfEventToken event) {
+    public void handle(SsfEventToken eventToken) {
         // RFC 8417 + SSF profile fields:
-        //   event.jti(), event.iss(), event.iat()
-        //   event.aud()                 — always List<String>, even single-aud SETs
-        //   event.events()              — Map<eventTypeURI, payload> (RFC 8417 §2.2)
-        //   event.subjectId()           — sub_id object
-        //   event.txn()                 — transaction id, may be null
-        //   event.additionalProperties()— any unmodelled / future claims
+        //   eventToken.jti(), eventToken.iss(), eventToken.iat()
+        //   eventToken.aud()                 — always List<String>, even single-aud SETs
+        //   eventToken.events()              — Map<eventTypeURI, payload> (RFC 8417 §2.2)
+        //   eventToken.subjectId()           — sub_id object
+        //   eventToken.txn()                 — transaction id, may be null
+        //   eventToken.additionalProperties()— any unmodelled / future claims
     }
 }
 ```
@@ -186,14 +186,14 @@ public class SessionRevocationHandler implements SsfEventHandler {
     @Inject TokenCache tokens;
 
     @Override
-    public void handle(SsfEventToken event) {
-        String subjectId = (String) event.subjectId().get("sub");
+    public void handle(SsfEventToken eventToken) {
+        String subjectId = (String) eventToken.subjectId().get("sub");
         if (subjectId == null) return;
 
-        if (event.events().containsKey(SESSION_REVOKED)) {
+        if (eventToken.events().containsKey(SESSION_REVOKED)) {
             sessions.invalidateAllFor(subjectId);
         }
-        if (event.events().containsKey(CREDENTIAL_CHANGE)) {
+        if (eventToken.events().containsKey(CREDENTIAL_CHANGE)) {
             tokens.invalidateAllFor(subjectId);
             sessions.requireReauthFor(subjectId);
         }
@@ -230,21 +230,21 @@ public class KafkaForwarder implements SsfEventHandler {
     @Inject ObjectMapper json;
 
     @Override
-    public void handle(SsfEventToken event) {
+    public void handle(SsfEventToken eventToken) {
         // Forward the verified token + the alias-resolved issuer so downstream
         // consumers don't have to reproduce the alias lookup.
         Map<String, Object> payload = Map.of(
-                "jti", event.jti(),
-                "iss", event.iss(),
-                "issAlias", aliases.issuerAlias(event.iss()),
-                "iat", event.iat().toString(),
-                "events", event.events(),
-                "subjectId", event.subjectId(),
-                "additionalProperties", event.additionalProperties());
+                "jti", eventToken.jti(),
+                "iss", eventToken.iss(),
+                "issAlias", aliases.issuerAlias(eventToken.iss()),
+                "iat", eventToken.iat().toString(),
+                "events", eventToken.events(),
+                "subjectId", eventToken.subjectId(),
+                "additionalProperties", eventToken.additionalProperties());
         try {
             producer.send(json.writeValueAsString(payload));
         } catch (JsonProcessingException e) {
-            throw new RuntimeException("could not serialise SSF event " + event.jti(), e);
+            throw new RuntimeException("could not serialise SSF event " + eventToken.jti(), e);
         }
     }
 }
@@ -301,10 +301,10 @@ public class StepUpTrigger implements SsfEventHandler {
     @Inject SubjectFlags flags;
 
     @Override
-    public void handle(SsfEventToken event) {
-        if (event.events().containsKey(ASSURANCE_LEVEL_CHANGE)
-                || event.events().containsKey(DEVICE_COMPLIANCE)) {
-            String sub = (String) event.subjectId().get("sub");
+    public void handle(SsfEventToken eventToken) {
+        if (eventToken.events().containsKey(ASSURANCE_LEVEL_CHANGE)
+                || eventToken.events().containsKey(DEVICE_COMPLIANCE)) {
+            String sub = (String) eventToken.subjectId().get("sub");
             if (sub != null) {
                 flags.markRequiresStepUp(sub, Duration.ofMinutes(15));
             }

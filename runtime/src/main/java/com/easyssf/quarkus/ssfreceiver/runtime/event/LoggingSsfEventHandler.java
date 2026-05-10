@@ -35,12 +35,12 @@ public class LoggingSsfEventHandler implements SsfEventHandler {
     SsfAliases aliases;
 
     @Override
-    public void handle(SsfEventToken event) {
+    public void handle(SsfEventToken eventToken) {
         LOG.infof("SSF event received jti=%s iss=%s iat=%s events=%s",
-                event.jti(),
-                aliases.issuerAlias(event.iss()),
-                event.iat(),
-                eventTypeAliases(event.events()));
+                eventToken.jti(),
+                aliases.issuerAlias(eventToken.iss()),
+                eventToken.iat(),
+                eventTypeAliases(eventToken.events()));
     }
 
     private List<String> eventTypeAliases(Map<String, Object> events) {

@@ -205,8 +205,8 @@ public class SsfReceiverSmokeTest {
         final AtomicInteger invocations = new AtomicInteger();
 
         @Override
-        public void handle(SsfEventToken event) {
-            last.set(event);
+        public void handle(SsfEventToken eventToken) {
+            last.set(eventToken);
             invocations.incrementAndGet();
             latch.countDown();
         }

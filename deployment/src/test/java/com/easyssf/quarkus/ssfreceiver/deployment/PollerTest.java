@@ -371,12 +371,12 @@ public class PollerTest {
         final java.util.concurrent.atomic.AtomicBoolean throwOnNext = new java.util.concurrent.atomic.AtomicBoolean(false);
 
         @Override
-        public void handle(SsfEventToken event) {
+        public void handle(SsfEventToken eventToken) {
             invocations.incrementAndGet();
             if (throwOnNext.compareAndSet(true, false)) {
                 throw new RuntimeException("CapturingHandler intentionally throws");
             }
-            captured.add(event);
+            captured.add(eventToken);
         }
 
         void reset() {

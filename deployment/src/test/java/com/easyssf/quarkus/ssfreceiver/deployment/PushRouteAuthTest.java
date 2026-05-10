@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -175,12 +176,12 @@ public class PushRouteAuthTest {
         volatile CountDownLatch latch = new CountDownLatch(1);
         final AtomicReference<SsfEventToken> last = new AtomicReference<>();
         final AtomicInteger invocations = new AtomicInteger();
-        final java.util.concurrent.atomic.AtomicBoolean throwOnNext = new java.util.concurrent.atomic.AtomicBoolean(false);
-        final java.util.concurrent.atomic.AtomicBoolean threwLastTime = new java.util.concurrent.atomic.AtomicBoolean(false);
+        final AtomicBoolean throwOnNext = new AtomicBoolean(false);
+        final AtomicBoolean threwLastTime = new AtomicBoolean(false);
 
         @Override
-        public void handle(SsfEventToken event) {
-            last.set(event);
+        public void handle(SsfEventToken eventToken) {
+            last.set(eventToken);
             invocations.incrementAndGet();
             try {
                 if (throwOnNext.compareAndSet(true, false)) {

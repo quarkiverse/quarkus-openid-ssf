@@ -120,7 +120,7 @@ public class DedupIntegrationTest {
         final AtomicInteger invocations = new AtomicInteger();
 
         @Override
-        public void handle(SsfEventToken event) {
+        public void handle(SsfEventToken eventToken) {
             invocations.incrementAndGet();
             firstInvocation.countDown();
         }

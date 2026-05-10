@@ -16,5 +16,5 @@
 package com.easyssf.quarkus.ssfreceiver.runtime.event;
 
 public interface SsfEventHandler {
-    void handle(SsfEventToken event);
+    void handle(SsfEventToken eventToken);
 }
