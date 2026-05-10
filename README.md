@@ -70,9 +70,73 @@ event-type aliases at INFO.
 
 ## Quick start
 
-### Transmitter-managed (operator owns the stream)
+The fastest way to see the extension light up end-to-end is against the
+public [caep.dev](https://ssf.caep.dev) transmitter — no Keycloak setup,
+no public tunnel, and no admin server of your own. POLL delivery means
+caep.dev never has to reach back to your machine, so localhost is enough.
+
+### 1. Register at caep.dev and grab an access token
+
+Sign in at <https://ssf.caep.dev> and copy the access token from the
+dashboard. caep.dev hands these out long-lived and out-of-band rather than
+via an OAuth grant — they go in `Authorization: Bearer …` on every outbound
+call the receiver makes.
+
+### 2. Start a transmitter session at caep.dev
+
+Open <https://caep.dev/transmitter/events>, set the **audience** to a value
+of your choice (e.g. `https://my-receiver.example/ssf`), and start the
+transmitter. Leave the tab open — you'll fire events from here in step 5.
+
+### 3. Run the receiver-managed example in POLL mode
+
+```sh
+export SSF_RECEIVER_TRANSMITTER_ACCESS_TOKEN=<your-caep-dev-token>
+export SSF_RECEIVER_EXPECTED_AUDIENCE=https://my-receiver.example/ssf
+
+mvn -pl examples/example-receiver-managed-stream quarkus:dev \
+    -Dquarkus.profile=caepdev \
+    -Dssf.receiver.delivery-method=POLL \
+    -Dssf.receiver.poll.interval=5s
+```
+
+The `caepdev` profile points the receiver at `https://ssf.caep.dev` and
+selects the static-token outbound auth provider. The two `-D` overrides
+flip the example from PUSH (its profile default) to POLL — no inbound
+endpoint to expose. By default the receiver subscribes to
+`session-revoked` and `credential-change`; edit
+`ssf.receiver.events-requested` in `application.properties` to widen.
+
+### 4. Confirm the receiver registered with caep.dev
+
+```sh
+curl -s localhost:28080/transmitter/registration | jq
+# → the stream_id caep.dev assigned to this receiver
+```
+
+### 5. Trigger an event from caep.dev
+
+In the transmitter tab from step 2, fire a `session-revoked` (or any
+configured event type) for a subject of your choice.
+
+### 6. See it arrive
+
+```sh
+curl -s localhost:28080/events/recent-events | jq
+# → the most recent SET, with verified jti / iss / events / payload
+```
+
+That's the full receiver loop — discover-or-create stream, poll, verify
+signature & claims, dispatch to your handler, ack — running against a
+real transmitter in under a minute.
+
+### Minimum configuration cheatsheet
+
+For pointing at your own transmitter (Keycloak, on-prem IdP, custom),
+either of these snippets is enough:
 
 ```properties
+# Transmitter-managed (operator owns the stream)
 ssf.receiver.transmitter-issuer=https://transmitter.example
 ssf.receiver.stream-management=TRANSMITTER
 ssf.receiver.stream-id=<from the transmitter's admin / onboarding flow>
@@ -80,9 +144,8 @@ ssf.receiver.delivery-method=PUSH
 ssf.receiver.push.expected-auth-header=Bearer <shared-secret>   # optional
 ```
 
-### Receiver-managed (extension creates / rediscovers the stream)
-
 ```properties
+# Receiver-managed (extension creates / rediscovers the stream)
 ssf.receiver.transmitter-issuer=https://transmitter.example
 ssf.receiver.stream-management=RECEIVER
 ssf.receiver.delivery-method=PUSH                               # or POLL
