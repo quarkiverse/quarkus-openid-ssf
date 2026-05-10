@@ -27,14 +27,16 @@ OAuth2 access tokens fits.
 - Verifies every SET: JWS signature against the transmitter's JWKS, plus
   `iss` / `iat` / `jti` / `aud` checks per RFC 8417.
 - Manages stream lifecycle in two modes:
+    - **`RECEIVER`** (default) — extension calls the transmitter's
+      `configuration_endpoint` on startup to discover an existing stream or
+      create a new one.
     - **`TRANSMITTER`** — operator pre-creates the stream; receiver is given a `stream-id`.
-    - **`RECEIVER`** — extension calls the transmitter's `configuration_endpoint`
-      on startup to discover an existing stream or create a new one.
 - Exposes `SsfStreamClient` for the full §8.1.x management surface
   (read / create / patch / replace / delete config, status read+update,
   add/remove subjects, request verification, POLL).
 - Optional Micrometer metrics + per-event-type counters.
-- Optional outbound bearer-token auth via static token or `quarkus-oidc-client`.
+- Outbound auth: static bearer token, self-contained OAuth2
+  `client_credentials` (no extra dep), `quarkus-oidc-client`, or no-op.
 
 ## Layout
 
@@ -462,16 +464,32 @@ poller.pollNow();
 
 ## Outbound auth to the transmitter
 
+Four-way selection, made at **build time**. The first match wins:
+
 | Configured | Provider | Notes |
 |---|---|---|
-| `ssf.receiver.transmitter-access-token` set | `StaticTransmitterTokenProvider` | Sends the literal value as `Authorization: Bearer …`. For transmitters like caep.dev that issue long-lived tokens out-of-band. **Wins over OIDC when both are eligible.** |
-| `quarkus-oidc-client` on the classpath | `OidcTransmitterTokenProvider` | Fetches a token via `quarkus.oidc-client.*` (typically `client_credentials`). |
+| `ssf.receiver.transmitter-access-token` set | `StaticTransmitterTokenProvider` | Sends the literal value as `Authorization: Bearer …`. For transmitters like caep.dev that issue long-lived tokens out-of-band. |
+| `ssf.receiver.oauth2.token-endpoint` set | `Oauth2TransmitterTokenProvider` | Self-contained `client_credentials` grant — no `quarkus-oidc-client` dependency. Caches the token in-process with expiry-safety-window-aware refresh and concurrent-refresh coalescing. Supports `client_secret_basic` (default, RFC 6749 §2.3.1) and `client_secret_post` via `ssf.receiver.oauth2.client-auth-method`. |
+| `quarkus-oidc-client` on the classpath | `OidcTransmitterTokenProvider` | Fetches a token via `quarkus.oidc-client.*` (typically `client_credentials`). Useful when the consumer already wires OIDC for inbound auth and wants to share the client config. |
 | Neither | `NoopTransmitterTokenProvider` | No `Authorization` header. Fine for purely local stubs / public metadata. |
 
-The decision is made at **build time** — the deployment processor reads
-`ssf.receiver.transmitter-access-token` under the active profile and logs which
-provider it registered. Dev mode rebuilds on profile change so this is seamless;
-for a packaged jar, repackage with the desired profile.
+The deployment processor reads the activating properties under the active
+profile and logs which provider it registered. Dev mode rebuilds on profile
+change so this is seamless; for a packaged jar, repackage with the desired
+profile.
+
+```properties
+# Self-contained OAuth2 example — no quarkus-oidc-client needed.
+ssf.receiver.oauth2.token-endpoint=https://auth.example/oauth/token
+ssf.receiver.oauth2.client-id=my-client
+ssf.receiver.oauth2.client-secret=${OAUTH2_CLIENT_SECRET}
+# Optional defaults shown:
+#ssf.receiver.oauth2.grant-type=client_credentials
+#ssf.receiver.oauth2.client-auth-method=basic       # or 'post'
+#ssf.receiver.oauth2.scopes=ssf.read,ssf.manage
+#ssf.receiver.oauth2.expiry-safety-window=30s
+#ssf.receiver.oauth2.timeout=5s
+```
 
 JWKS, metadata, and the configuration endpoint (when called for stream
 discovery) are unauthenticated by SSF/OIDC convention — the extension does

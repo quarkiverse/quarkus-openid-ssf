@@ -51,7 +51,7 @@ public class OidcTransmitterTokenProvider implements TransmitterTokenProvider {
     @Override
     public Optional<String> accessToken() {
         try {
-            Tokens tokens = oidcClient.getTokens().await().atMost(config.oidcClientTokenTimeout());
+            Tokens tokens = oidcClient.getTokens().await().atMost(config.oidc().tokenTimeout());
             if (tokens == null) {
                 return Optional.empty();
             }

@@ -57,6 +57,7 @@ class SsfReceiverProcessor {
     private static final String OIDC_CLIENT_CAPABILITY = "io.quarkus.oidc.client";
     private static final String OIDC_TOKEN_PROVIDER_CLASS = "com.easyssf.quarkus.ssfreceiver.runtime.auth.OidcTransmitterTokenProvider";
     private static final String STATIC_TOKEN_PROPERTY = "ssf.receiver.transmitter-access-token";
+    private static final String OAUTH2_TOKEN_ENDPOINT_PROPERTY = "ssf.receiver.oauth2.token-endpoint";
     /**
      * The capability advertised by {@code quarkus-micrometer} (and pulled in transitively
      * by every {@code quarkus-micrometer-registry-*} extension). Note the capability
@@ -150,10 +151,34 @@ class SsfReceiverProcessor {
     }
 
     /**
+     * Registers {@code Oauth2TransmitterTokenProvider} when
+     * {@link #OAUTH2_TOKEN_ENDPOINT_PROPERTY} is set and a static token isn't.
+     * Self-contained client_credentials grant — runs without
+     * {@code quarkus-oidc-client}, takes precedence over it when both could
+     * apply. Consumers who want OIDC simply leave this property unset.
+     */
+    @BuildStep
+    AdditionalBeanBuildItem registerOauth2TokenProvider() {
+        if (staticTokenConfigured()) {
+            return null;
+        }
+        if (!oauth2TokenEndpointConfigured()) {
+            return null;
+        }
+        LOG.infof("%s configured — registering Oauth2TransmitterTokenProvider",
+                OAUTH2_TOKEN_ENDPOINT_PROPERTY);
+        return AdditionalBeanBuildItem.builder()
+                .setUnremovable()
+                .addBeanClass(com.easyssf.quarkus.ssfreceiver.runtime.auth.Oauth2TransmitterTokenProvider.class)
+                .build();
+    }
+
+    /**
      * Registers the OIDC-backed {@code TransmitterTokenProvider} only when the consumer
      * has {@code quarkus-oidc-client} on the classpath <em>and</em> hasn't pinned a
-     * static {@code transmitter-access-token}. Without either, the default no-op
-     * provider stays in effect and outbound calls go unauthenticated.
+     * static {@code transmitter-access-token} or configured {@link #OAUTH2_TOKEN_ENDPOINT_PROPERTY}.
+     * Without any of those, the default no-op provider stays in effect and outbound
+     * calls go unauthenticated.
      */
     @BuildStep
     AdditionalBeanBuildItem registerOidcTokenProvider(Capabilities capabilities) {
@@ -162,6 +187,11 @@ class SsfReceiverProcessor {
         }
         if (staticTokenConfigured()) {
             LOG.infof("%s is set — skipping OidcTransmitterTokenProvider", STATIC_TOKEN_PROPERTY);
+            return null;
+        }
+        if (oauth2TokenEndpointConfigured()) {
+            LOG.infof("%s is set — skipping OidcTransmitterTokenProvider",
+                    OAUTH2_TOKEN_ENDPOINT_PROPERTY);
             return null;
         }
         LOG.infof("quarkus-oidc-client detected — registering OidcTransmitterTokenProvider");
@@ -174,6 +204,13 @@ class SsfReceiverProcessor {
     private static boolean staticTokenConfigured() {
         return ConfigProvider.getConfig()
                 .getOptionalValue(STATIC_TOKEN_PROPERTY, String.class)
+                .filter(s -> !s.isBlank())
+                .isPresent();
+    }
+
+    private static boolean oauth2TokenEndpointConfigured() {
+        return ConfigProvider.getConfig()
+                .getOptionalValue(OAUTH2_TOKEN_ENDPOINT_PROPERTY, String.class)
                 .filter(s -> !s.isBlank())
                 .isPresent();
     }

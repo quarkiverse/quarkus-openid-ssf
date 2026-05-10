@@ -196,8 +196,9 @@ curl -s localhost:28080/events/recent-events   | jq    # see what arrived
 ### `keycloak` profile — Keycloak / POLL
 
 ```sh
-export KEYCLOAK_AUTH_SERVER_URL=https://your-kc/realms/ssf-poc
-export KEYCLOAK_RECEIVER_MANAGED_CLIENT_SECRET=<oidc-client-secret>
+export OIDC_ISSUER_URL=https://your-kc/realms/ssf-poc
+export SSF_RECEIVER_CLIENT_ID=quarkus-ssf-receiver
+export SSF_RECEIVER_CLIENT_SECRET=<oidc-client-secret>
 export SSF_RECEIVER_TRANSMITTER_ISSUER=https://your-kc/realms/ssf-poc
 export SSF_RECEIVER_ISSUER_ALIASES_KEYCLOAKSSFPOC=https://your-kc/realms/ssf-poc
 
@@ -210,12 +211,13 @@ Notable differences from default:
   at build time even if `SSF_RECEIVER_TRANSMITTER_ACCESS_TOKEN` is set globally.
 - `delivery-method=POLL` + `poll.*` settings — no tunnel needed; the receiver
   pulls from the transmitter.
-- `quarkus.oidc-client.*` configured for `client_credentials` against the
-  Keycloak realm. Same `client-id` as the transmitter-managed example
-  (`quarkus-ssf-receiver`), but a separate client secret env var
-  (`KEYCLOAK_RECEIVER_MANAGED_CLIENT_SECRET` vs `KEYCLOAK_TRANSMITTER_MANAGED_CLIENT_SECRET`)
-  so the two examples can run against distinct Keycloak clients if you want
-  separate audit trails / rate-limits.
+- Outbound auth: the file ships with `quarkus.oidc-client.*` **active** (so
+  the OIDC-backed `TransmitterTokenProvider` is selected by default) and the
+  alternative `ssf.receiver.oauth2.*` block commented out as a reference for
+  the self-contained `Oauth2TransmitterTokenProvider`. To switch, comment
+  the OIDC block and uncomment the Oauth2 one — both read the same
+  `SSF_RECEIVER_CLIENT_ID` / `SSF_RECEIVER_CLIENT_SECRET` / `OIDC_ISSUER_URL`
+  env vars.
 
 Manual POLL trigger (works alongside the periodic timer):
 

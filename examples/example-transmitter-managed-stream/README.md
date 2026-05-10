@@ -70,9 +70,9 @@ for the realm setup.
 | `SSF_RECEIVER_TRANSMITTER_METADATA_URL` | usually | **Keycloak quirk:** Keycloak serves the SSF metadata at `<issuer>/.well-known/ssf-configuration` (OIDC-style suffix), but the SSF §7.2 splice rule the extension uses by default puts it at `<host>/.well-known/ssf-configuration<issuer-path>`. Set this env var to the actual Keycloak URL, e.g. `https://kc.example/realms/ssf-poc/.well-known/ssf-configuration`. |
 | `SSF_RECEIVER_EXPECTED_AUDIENCE` | optional | The `aud` claim this receiver expects on inbound SETs. Defaults to a placeholder. |
 | `SSF_RECEIVER_PUSH_EXPECTED_AUTH_HEADER` | optional | Shared secret enforced on inbound `Authorization`. Uncomment the matching line in `application.properties` to activate. |
-| `KEYCLOAK_AUTH_SERVER_URL` | yes | The OIDC issuer used by `quarkus-oidc-client` to discover the token endpoint — typically the same as `SSF_RECEIVER_TRANSMITTER_ISSUER`. |
-| `KEYCLOAK_TRANSMITTER_MANAGED_CLIENT_ID` | optional | Defaults to `quarkus-ssf-receiver`. Override if your client is registered under a different name. |
-| `KEYCLOAK_TRANSMITTER_MANAGED_CLIENT_SECRET` | yes | The OIDC client secret. Distinct env-var name from `KEYCLOAK_RECEIVER_MANAGED_CLIENT_SECRET` (used by the receiver-managed example) so the two examples can run against separate Keycloak clients. |
+| `OIDC_ISSUER_URL` | yes | The OIDC issuer used by `quarkus-oidc-client` to discover the token endpoint — typically the same as `SSF_RECEIVER_TRANSMITTER_ISSUER`. |
+| `SSF_RECEIVER_CLIENT_ID` | yes | The OIDC client id this receiver authenticates as. |
+| `SSF_RECEIVER_CLIENT_SECRET` | yes | The OIDC client secret. Shared with the receiver-managed example — run both against the same Keycloak client, or against distinct clients by overriding the value in one of the two profiles. |
 
 ```sh
 export SSF_RECEIVER_TRANSMITTER_ISSUER=https://kc.example/realms/ssf-poc
@@ -80,8 +80,9 @@ export SSF_RECEIVER_TRANSMITTER_METADATA_URL=https://kc.example/realms/ssf-poc/.
 export SSF_RECEIVER_STREAM_ID=<stream-id-from-keycloak-admin>
 export SSF_RECEIVER_EXPECTED_AUDIENCE=https://my.expected.audience.com
 
-export KEYCLOAK_AUTH_SERVER_URL=https://kc.example/realms/ssf-poc
-export KEYCLOAK_TRANSMITTER_MANAGED_CLIENT_SECRET=<client-secret>
+export OIDC_ISSUER_URL=https://kc.example/realms/ssf-poc
+export SSF_RECEIVER_CLIENT_ID=quarkus-ssf-receiver
+export SSF_RECEIVER_CLIENT_SECRET=<client-secret>
 ```
 
 The push endpoint must be reachable from Keycloak. For local dev, point the
@@ -133,11 +134,13 @@ mvn -pl examples/example-receiver-managed-stream quarkus:dev \
     -Dquarkus.http.port=28081
 ```
 
-The two examples were designed to coexist against the same Keycloak realm —
-they use **distinct client-secret env vars** (`KEYCLOAK_TRANSMITTER_MANAGED_CLIENT_SECRET`
-vs `KEYCLOAK_RECEIVER_MANAGED_CLIENT_SECRET`) so you can register two separate
-OIDC clients with independent audit trails / rate-limits if desired, or reuse
-the same client by setting both env vars to the same value.
+The two examples were designed to coexist against the same Keycloak realm.
+They read the same `OIDC_ISSUER_URL` / `SSF_RECEIVER_CLIENT_ID` /
+`SSF_RECEIVER_CLIENT_SECRET` env vars by default, so out of the box they
+share one OIDC client. To run them against separate clients (independent
+audit trails / rate-limits), override the values for one of the two
+examples — e.g. via `-Dsmallrye.config.profile=…` profile files or by
+exporting different env vars in the shell that runs that example.
 
 ## Metrics
 

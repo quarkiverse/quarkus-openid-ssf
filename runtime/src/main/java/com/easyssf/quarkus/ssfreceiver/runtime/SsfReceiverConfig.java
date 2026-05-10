@@ -27,7 +27,28 @@ import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
 
 /**
- * Configuration for the SSF receiver extension.
+ * Configuration for the {@code quarkus-ssf-receiver} extension. All properties
+ * are prefixed with {@code ssf.receiver.}.
+ *
+ * <p>
+ * Top-level properties cover the cross-cutting receiver identity (issuer,
+ * audience, stream management mode, delivery method) and outbound auth
+ * (static token vs OAuth2 vs OIDC). Per-feature settings live on nested
+ * interfaces:
+ * <ul>
+ * <li>{@link Push} — inbound PUSH endpoint</li>
+ * <li>{@link Poll} — outbound POLL loop</li>
+ * <li>{@link ReceiverManaged} — discover-or-create stream registration</li>
+ * <li>{@link TransmitterManaged} — startup stream probe</li>
+ * <li>{@link Dedup} — jti deduplication layer</li>
+ * <li>{@link Oauth2} — self-contained {@code client_credentials} provider</li>
+ * <li>{@link Oidc} — call-site behavior for the {@code quarkus-oidc-client}-backed provider</li>
+ * </ul>
+ *
+ * <p>
+ * Outbound token-provider selection is made at build time, in this precedence:
+ * Static ({@code transmitter-access-token}) → Oauth2 ({@code oauth2.token-endpoint})
+ * → OIDC ({@code quarkus-oidc-client} on classpath) → no-op.
  */
 @ConfigRoot(phase = ConfigPhase.RUN_TIME)
 @ConfigMapping(prefix = "ssf.receiver")
@@ -64,14 +85,31 @@ public interface SsfReceiverConfig {
      */
     Optional<String> expectedAudience();
 
-    /** Who owns the stream lifecycle. v1 only supports {@link StreamManagement#TRANSMITTER}. */
-    @WithDefault("TRANSMITTER")
+    /**
+     * Who owns the stream lifecycle. {@link StreamManagement#RECEIVER} (the
+     * default) means the extension performs a discover-or-create on startup
+     * — see {@link ReceiverManaged} — and is the most common shape for
+     * SSF receivers in practice. {@link StreamManagement#TRANSMITTER} means
+     * the operator pre-creates the stream in the transmitter's admin console
+     * and pins the assigned {@link #streamId()} here.
+     */
+    @WithDefault("RECEIVER")
     StreamManagement streamManagement();
 
-    /** Stream id assigned by the transmitter. Required when stream-management = TRANSMITTER. */
+    /**
+     * Stream id pinned by the operator. Required when
+     * {@link #streamManagement()} is {@link StreamManagement#TRANSMITTER};
+     * optional in {@link StreamManagement#RECEIVER} mode (if set, the
+     * registrar skips its discover-or-create step and uses this id directly).
+     */
     Optional<String> streamId();
 
-    /** Delivery method. v1 only supports {@link DeliveryMethod#PUSH}. */
+    /**
+     * How SETs are delivered. {@link DeliveryMethod#PUSH} (the default,
+     * RFC 8935) — the transmitter POSTs each SET to {@link Push#endpointPath()}.
+     * {@link DeliveryMethod#POLL} (RFC 8936) — the extension pulls SETs from
+     * the transmitter's poll endpoint; see {@link Poll}.
+     */
     @WithDefault("PUSH")
     DeliveryMethod deliveryMethod();
 
@@ -161,17 +199,21 @@ public interface SsfReceiverConfig {
     Optional<List<String>> eventsRequested();
 
     /**
-     * Short aliases for event-type URIs — used as the {@code event} tag value on
-     * the {@code ssf.receiver.events.processed} meter. Keyed by alias, valued by URI:
+     * Short aliases for event-type URIs — used as the {@code event} tag value
+     * on the {@code ssf.receiver.events.processed} meter and as accepted
+     * input to {@link #eventsRequested()}. Keyed by alias, valued by URI:
      *
      * <pre>
-     *   ssf.receiver.event-aliases.CaepSessionRevoked=https://schemas.openid.net/secevent/caep/event-type/session-revoked
+     *   ssf.receiver.event-aliases.VendorWidgetReplaced=https://schemas.example.org/vendor/event-type/widget-replaced
      * </pre>
      *
      * <p>
-     * Built-in aliases for the SSF spec event types (verification,
-     * stream-updated) are always registered; user entries with the same URI
-     * override them. Unknown URIs fall back to the URI itself as the tag value.
+     * Built-in aliases for the OpenID SSF, CAEP 1.0, and RISC 1.0 spec event
+     * types are always registered out of the box (e.g.
+     * {@code SsfStreamVerification}, {@code CaepSessionRevoked},
+     * {@code RiscAccountDisabled}, …); user entries with the same URI
+     * override the built-in alias name. Unknown URIs fall back to the URI
+     * itself as the tag value.
      */
     Map<String, URI> eventAliases();
 
@@ -203,19 +245,22 @@ public interface SsfReceiverConfig {
      */
     Optional<String> alias();
 
-    /** Reserved; OIDC client config drives outbound auth via {@code quarkus.oidc-client.*}. */
-    Optional<String> clientId();
-
-    /** Reserved; OIDC client config drives outbound auth via {@code quarkus.oidc-client.*}. */
-    Optional<String> clientSecret();
+    /**
+     * Self-contained OAuth2 {@code client_credentials} grant settings for
+     * outbound calls to the transmitter — used when the consumer doesn't want
+     * to pull in {@code quarkus-oidc-client}. See {@link Oauth2}.
+     */
+    Oauth2 oauth2();
 
     /**
-     * Maximum time to wait when fetching an access token from {@code OidcClient} for
-     * outbound calls to the transmitter. Only consulted when {@code quarkus-oidc-client}
-     * is on the classpath. Defaults to 2 seconds.
+     * Fine-grained settings for the {@code quarkus-oidc-client}-backed
+     * outbound token provider — orthogonal to {@code quarkus.oidc-client.*},
+     * which governs the OIDC client itself. Only consulted when
+     * {@code quarkus-oidc-client} is on the classpath AND neither
+     * {@link #transmitterAccessToken()} nor {@link Oauth2#tokenEndpoint()}
+     * is set (otherwise the higher-precedence provider wins). See {@link Oidc}.
      */
-    @WithDefault("2s")
-    Duration oidcClientTokenTimeout();
+    Oidc oidc();
 
     interface Push {
         /** Path of the push endpoint, relative to {@code quarkus.http.root-path}. */
@@ -362,6 +407,117 @@ public interface SsfReceiverConfig {
         boolean probeOnStartup();
     }
 
+    /**
+     * Self-contained OAuth2 grant settings — used when the consumer doesn't
+     * want to pull in {@code quarkus-oidc-client} for outbound transmitter
+     * auth. Activated whenever {@link Oauth2#tokenEndpoint()} is set; the
+     * deployment processor then registers {@code Oauth2TransmitterTokenProvider}
+     * (in preference to the OIDC-backed provider) and tokens are fetched and
+     * cached in-process with an {@link Oauth2#expirySafetyWindow()}-aware
+     * refresh policy.
+     *
+     * <p>
+     * Default {@link Oauth2#grantType()} is {@code client_credentials}
+     * (RFC 6749 §4.4) — the only grant the receiver typically needs for
+     * outbound transmitter management calls. Other values let consumers
+     * point at non-standard or extension grants if their IdP requires them.
+     */
+    interface Oauth2 {
+        /**
+         * Token endpoint URL where the OAuth2 grant is exchanged. Setting
+         * this activates the OAuth2 provider; leaving it empty falls through
+         * to the OIDC / no-op providers.
+         */
+        Optional<URI> tokenEndpoint();
+
+        /**
+         * OAuth2 grant type sent in the {@code grant_type} form parameter.
+         * Default is {@code client_credentials} (RFC 6749 §4.4) — the only
+         * grant the receiver needs for outbound transmitter calls. Override
+         * for non-standard or extension grants (e.g.
+         * {@code urn:ietf:params:oauth:grant-type:jwt-bearer}).
+         */
+        @WithDefault("client_credentials")
+        String grantType();
+
+        /**
+         * Which client-authentication method to use when sending the
+         * {@link #clientId()} / {@link #clientSecret()} pair. RFC 6749 §2.3.1
+         * defines two:
+         * <ul>
+         * <li>{@code basic} — HTTP Basic header
+         * ({@code Authorization: Basic base64(client_id:client_secret)}).
+         * RECOMMENDED by the spec and the default here.</li>
+         * <li>{@code post} — credentials in the form body
+         * ({@code client_id=…&client_secret=…}). Some servers (notably caep.dev
+         * and various older IdPs) only accept this form.</li>
+         * </ul>
+         */
+        @WithDefault("basic")
+        ClientAuthMethod clientAuthMethod();
+
+        /**
+         * OAuth2 client identifier. Sent in the {@code client_id} form
+         * parameter when {@link #clientAuthMethod()} is {@code post}, or as
+         * the basic-auth username when {@code basic}.
+         */
+        Optional<String> clientId();
+
+        /**
+         * OAuth2 client secret. Sent in the {@code client_secret} form
+         * parameter when {@link #clientAuthMethod()} is {@code post}, or as
+         * the basic-auth password when {@code basic}.
+         */
+        Optional<String> clientSecret();
+
+        /**
+         * Optional space-separated {@code scope} request parameter. List form
+         * in config (e.g. {@code ssf.receiver.oauth2.scopes=ssf.read,ssf.manage});
+         * the values are joined with single spaces on the wire.
+         */
+        Optional<List<String>> scopes();
+
+        /**
+         * Extra form parameters appended verbatim to the token-endpoint POST.
+         * Escape hatch for server-specific extensions (e.g. {@code resource=}
+         * on Microsoft Entra, vendor-specific tenant identifiers, etc.).
+         */
+        Map<String, String> additionalParams();
+
+        /**
+         * Subtracted from the token endpoint's reported {@code expires_in}
+         * before the provider treats a cached token as expired. Default is 30s,
+         * which covers typical clock skew + the duration of the outbound call
+         * the token is about to authenticate.
+         */
+        @WithDefault("30s")
+        Duration expirySafetyWindow();
+
+        /** Connect / read timeout for the token endpoint POST. Default is 5s. */
+        @WithDefault("5s")
+        Duration timeout();
+    }
+
+    /**
+     * Settings for the {@code quarkus-oidc-client}-backed outbound token
+     * provider. These are receiver-extension wrappers around the OIDC client
+     * — {@code quarkus.oidc-client.*} is the underlying client config; this
+     * interface holds the call-site behavior the extension layers on top
+     * (e.g. how long to wait for a token, retry policy, …) and isn't
+     * something the OIDC client itself exposes.
+     */
+    interface Oidc {
+        /**
+         * Maximum time to wait when fetching an access token from
+         * {@code OidcClient.getTokens()} for outbound calls to the
+         * transmitter. Bounds the {@code Uni.await().atMost(...)} on the
+         * call site so a slow / unresponsive OIDC token endpoint doesn't
+         * stall a Vert.x event loop indefinitely. Defaults to 2s.
+         */
+        @WithDefault("2s")
+        Duration tokenTimeout();
+    }
+
     enum StreamManagement {
         TRANSMITTER,
         RECEIVER
@@ -370,5 +526,13 @@ public interface SsfReceiverConfig {
     enum DeliveryMethod {
         PUSH,
         POLL
+    }
+
+    /** RFC 6749 §2.3.1 client-authentication methods supported on the OAuth2 token endpoint. */
+    enum ClientAuthMethod {
+        /** HTTP Basic header — RFC 6749 §2.3.1 RECOMMENDED. */
+        BASIC,
+        /** {@code client_id} + {@code client_secret} in the form body. */
+        POST
     }
 }
