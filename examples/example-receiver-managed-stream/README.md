@@ -12,7 +12,7 @@ the env-vars for two well-known transmitters.
 | Configuration | Activate with | Transmitter | Auth | Delivery |
 |---|---|---|---|---|
 | _default_ | `mvn quarkus:dev` (+ env vars) | _whatever you point it at_ | Static bearer token (if `SSF_RECEIVER_TRANSMITTER_ACCESS_TOKEN` is set) or OIDC | PUSH |
-| `caepdev` | `-Dquarkus.profile=caepdev` | [caep.dev](https://ssf.caep.dev) | Static bearer token | PUSH |
+| `caepdev` | `-Dquarkus.profile=caepdev` | [caep.dev](https://ssf.caep.dev) | Static bearer token | PUSH (default) or POLL via `-D` overrides |
 | `keycloak` | `-Dquarkus.profile=keycloak` | The [transmitter-managed example](../example-transmitter-managed-stream/)'s realm | OIDC `client_credentials` | POLL |
 
 Each profile lives in its own sibling file (`application-caepdev.properties`,
@@ -138,6 +138,60 @@ curl -s localhost:28080/streams/default          | jq
 curl -s -X POST localhost:28080/streams/default/verify    # triggers a Verification SET
 curl -s localhost:28080/events/recent-events     | jq     # see what arrived
 ```
+
+### `caepdev` profile — caep.dev / POLL (no tunnel needed)
+
+Same profile, no public push endpoint required. The receiver pulls SETs from
+caep.dev on a periodic Vert.x timer; nothing reaches back to your machine, so
+this works behind NAT, on a coffee-shop wifi, in CI, etc.
+
+#### 1. Get a caep.dev access token
+
+Same as the PUSH path — register at <https://ssf.caep.dev>, copy the token:
+
+```sh
+export SSF_RECEIVER_TRANSMITTER_ACCESS_TOKEN=<your-caep-dev-token>
+```
+
+#### 2. Start with POLL delivery overrides
+
+```sh
+mvn -pl examples/example-receiver-managed-stream quarkus:dev \
+    -Dquarkus.profile=caepdev \
+    -Dssf.receiver.delivery-method=POLL \
+    -Dssf.receiver.poll.interval=5s
+```
+
+The `caepdev` profile pins the issuer and access-token; the `-D` overrides
+flip the delivery mode. caep.dev assigns the poll URL when the registrar
+creates the stream, so the extension discovers it from the returned stream
+config — no `push.delivery-endpoint-url` to set.
+
+Expected boot log on first run:
+
+```
+INFO  ssf.receiver.transmitter-access-token configured — registering StaticTransmitterTokenProvider
+INFO  Receiver-managed mode: no existing stream matched (delivery-method=POLL) — creating a new one
+INFO  Receiver-managed mode: created stream stream_id=… (status=enabled, delivery-method=POLL, poll_endpoint=https://ssf.caep.dev/…, events_delivered=[CaepSessionRevoked, CaepCredentialChange])
+INFO  POLL delivery: scheduling poll of https://ssf.caep.dev/… every 5000ms (start-delay=0ms, max-events=100, return-immediately=true)
+```
+
+#### 3. Trigger and confirm
+
+Fire an event from the caep.dev UI (or hit a transmitter endpoint that emits
+one), then watch it arrive on the next poll tick:
+
+```sh
+curl -s localhost:28080/streams/default        | jq    # stream config + delivery.endpoint_url
+curl -s -X POST localhost:28080/streams/default/poll   # force one cycle now instead of waiting
+curl -s localhost:28080/events/recent-events   | jq    # see what arrived
+```
+
+> **Production cadence.** `poll.interval=5s` is for the demo. A sensible
+> production setup is either `return-immediately=false` (long-poll, the
+> transmitter holds the request open until events show up — lowest latency
+> with the fewest requests) or a longer interval like `30s` if your
+> transmitter doesn't support long-poll.
 
 ### `keycloak` profile — Keycloak / POLL
 
