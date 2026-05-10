@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.easyssf</groupId>
+    <artifactId>quarkus-ssf-receiver-parent</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>Quarkus SSF Receiver - Parent</name>
+    <description>Shared Signals Framework receiver extension for Quarkus.</description>
+
+    <modules>
+        <module>runtime</module>
+        <module>deployment</module>
+        <module>examples/example-transmitter-managed-stream</module>
+        <module>examples/example-receiver-managed-stream</module>
+    </modules>
+
+    <properties>
+        <!--
+            Extension floor: the runtime + deployment artifacts must compile and
+            run on Java 21 so consumer apps don't have to upgrade. The example
+            apps inherit this floor — they're meant to be copy-pasteable for
+            consumers, so they should run on the same minimum.
+        -->
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!--
+            Surefire's @{argLine} placeholder for plugin chaining (Jacoco etc).
+            Default to empty so runtime/pom.xml's javaagent argLine substitution
+            resolves cleanly when no other plugin sets it.
+        -->
+        <argLine/>
+
+        <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
+        <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
+        <quarkus.platform.version>3.35.2</quarkus.platform.version>
+
+        <wiremock.version>3.9.1</wiremock.version>
+
+        <compiler-plugin.version>3.15.0</compiler-plugin.version>
+        <surefire-plugin.version>3.5.4</surefire-plugin.version>
+        <license-plugin.version>4.5</license-plugin.version>
+        <spotless-plugin.version>2.46.0</spotless-plugin.version>
+        <skipITs>true</skipITs>
+
+        <!-- Used in the license header template; bump when copyright year changes. -->
+        <license.year>2026</license.year>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>${quarkus.platform.group-id}</groupId>
+                <artifactId>${quarkus.platform.artifact-id}</artifactId>
+                <version>${quarkus.platform.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!--
+                nimbus-jose-jwt is managed by quarkus-bom (10.8 in 3.35.x); we
+                pull it in via quarkus-ssf-receiver/runtime's direct dep so the
+                version is whatever the active Quarkus platform pins.
+            -->
+            <dependency>
+                <groupId>org.wiremock</groupId>
+                <artifactId>wiremock</artifactId>
+                <version>${wiremock.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${compiler-plugin.version}</version>
+                    <configuration>
+                        <parameters>true</parameters>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${surefire-plugin.version}</version>
+                    <configuration>
+                        <systemPropertyVariables>
+                            <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                            <maven.home>${maven.home}</maven.home>
+                        </systemPropertyVariables>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <version>${surefire-plugin.version}</version>
+                    <configuration>
+                        <systemPropertyVariables>
+                            <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                            <maven.home>${maven.home}</maven.home>
+                        </systemPropertyVariables>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>io.quarkus</groupId>
+                    <artifactId>quarkus-extension-maven-plugin</artifactId>
+                    <version>${quarkus.platform.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>${quarkus.platform.group-id}</groupId>
+                    <artifactId>quarkus-maven-plugin</artifactId>
+                    <version>${quarkus.platform.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>com.mycila</groupId>
+                    <artifactId>license-maven-plugin</artifactId>
+                    <version>${license-plugin.version}</version>
+                    <configuration>
+                        <licenseSets>
+                            <licenseSet>
+                                <header>${maven.multiModuleProjectDirectory}/etc/license-header.txt</header>
+                                <includes>
+                                    <include>**/*.java</include>
+                                </includes>
+                                <excludes>
+                                    <exclude>**/target/**</exclude>
+                                    <exclude>**/generated-sources/**</exclude>
+                                </excludes>
+                            </licenseSet>
+                        </licenseSets>
+                        <properties>
+                            <license.year>${license.year}</license.year>
+                        </properties>
+                        <mapping>
+                            <java>SLASHSTAR_STYLE</java>
+                        </mapping>
+                        <strictCheck>true</strictCheck>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>com.diffplug.spotless</groupId>
+                    <artifactId>spotless-maven-plugin</artifactId>
+                    <version>${spotless-plugin.version}</version>
+                    <configuration>
+                        <java>
+                            <includes>
+                                <include>src/main/java/**/*.java</include>
+                                <include>src/test/java/**/*.java</include>
+                            </includes>
+                            <eclipse>
+                                <file>${maven.multiModuleProjectDirectory}/etc/eclipse-format.xml</file>
+                            </eclipse>
+                            <importOrder>
+                                <file>${maven.multiModuleProjectDirectory}/etc/quarkus.importorder</file>
+                            </importOrder>
+                            <removeUnusedImports/>
+                            <trimTrailingWhitespace/>
+                            <endWithNewline/>
+                            <!--
+                                Intentionally NOT configuring `licenseHeader` here —
+                                license-maven-plugin already manages headers and Spotless
+                                fighting it would surprise contributors.
+                            -->
+                        </java>
+                        <pom>
+                            <includes>
+                                <include>pom.xml</include>
+                            </includes>
+                            <sortPom>
+                                <expandEmptyElements>false</expandEmptyElements>
+                                <nrOfIndentSpace>4</nrOfIndentSpace>
+                            </sortPom>
+                        </pom>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
+        <plugins>
+            <!--
+                Apache-2.0 license header check on `mvn verify` / `mvn install` (and CI).
+                Intentionally NOT bound to `validate` — that would trigger on `quarkus:dev`
+                and any other lifecycle-touching goal, blocking a transient IDE-created
+                file from breaking dev mode. Run `mvn license:format` to apply or repair
+                headers in bulk before committing.
+            -->
+            <plugin>
+                <groupId>com.mycila</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>check-license-headers</id>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <phase>verify</phase>
+                    </execution>
+                </executions>
+            </plugin>
+            <!--
+                Java formatting + import ordering via Quarkus's Eclipse formatter config.
+                `mvn spotless:apply` reformats; bound to `verify` (same rationale as
+                license-maven-plugin above) so dev mode stays unblocked while CI fails
+                on un-formatted code.
+            -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>spotless-check</id>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <phase>verify</phase>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

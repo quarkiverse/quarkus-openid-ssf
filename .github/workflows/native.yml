@@ -1,0 +1,70 @@
+name: Native build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly run catches drift when transitive Quarkus / Mandrel releases
+    # change native compatibility under our feet.
+    - cron: '17 6 * * 1'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-compile:
+    name: Native compile · ${{ matrix.example }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Native builds are slow (~5–10 min each) so we only check the two
+        # consumer apps. If they compile, the extension's bytecode is
+        # native-image-friendly. Adding a runtime-level smoke test would
+        # require a separate test app; tracked as a follow-up.
+        example:
+          - example-transmitter-managed-stream
+          - example-receiver-managed-stream
+    steps:
+      - uses: actions/checkout@v4
+
+      # graalvm-community is the open-source Mandrel-equivalent; the version
+      # tracks the Quarkus platform in pom.xml. Bump together when Quarkus
+      # bumps its required GraalVM version.
+      - name: Set up GraalVM 21
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '21'
+          distribution: graalvm-community
+          cache: maven
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Install the runtime + deployment artifacts first so the example
+      # build can resolve them locally.
+      - name: Install runtime + deployment
+        run: mvn --batch-mode --no-transfer-progress -DskipTests -pl runtime,deployment install
+
+      - name: Native compile
+        run: |
+          mvn --batch-mode --no-transfer-progress \
+            -DskipTests \
+            -pl examples/${{ matrix.example }} \
+            -am \
+            -Pnative \
+            package
+
+      # Surface the binary's size / linkage in the run log so any sudden
+      # explosion is visible at a glance.
+      - name: Inspect native binary
+        run: |
+          BIN=$(find examples/${{ matrix.example }}/target -maxdepth 2 -type f -perm -u+x ! -name "*.jar" ! -name "*.so" | head -n1)
+          if [ -z "$BIN" ]; then
+            echo "::error::No native binary produced under examples/${{ matrix.example }}/target/"
+            exit 1
+          fi
+          echo "Native binary: $BIN"
+          ls -lh "$BIN"
+          file "$BIN"

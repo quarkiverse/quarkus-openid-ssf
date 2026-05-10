@@ -1,0 +1,13 @@
+Quarkus SSF Receiver Extension
+Copyright 2026 Thomas Darimont and the easyssf.com contributors.
+
+This product includes software developed by Thomas Darimont
+(https://easyssf.com).
+
+This product is licensed under the Apache License, Version 2.0
+(see the LICENSE file in the root of this repository).
+
+Third-party dependencies retain their respective licenses; consult their
+project metadata for details. Notable runtime dependencies include:
+  - Quarkus (Apache-2.0) — https://quarkus.io
+  - Nimbus JOSE+JWT (Apache-2.0) — https://connect2id.com/products/nimbus-jose-jwt
