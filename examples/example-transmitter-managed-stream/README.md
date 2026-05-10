@@ -3,7 +3,13 @@
 Standalone Quarkus app that consumes the `quarkus-ssf-receiver` extension in
 **`stream-management=TRANSMITTER`** mode against a Keycloak SSF transmitter,
 using **PUSH** delivery (RFC 8935). The operator pre-creates the stream in
-Keycloak; this app is configured with the resulting `stream-id`.
+Keycloak's admin console; this app is configured with the resulting
+`stream_id` and the OIDC credentials needed for outbound `/streams/*` calls.
+
+The default `application.properties` is **driven entirely by environment
+variables** — nothing transmitter-specific is hard-coded, so the file is safe
+to commit and the same example can be pointed at any Keycloak realm by
+swapping env vars.
 
 > **Heads-up.** All `/events`, `/streams`, `/transmitter` endpoints are
 > unauthenticated by design — they're developer aids to confirm end-to-end SSF
@@ -34,47 +40,54 @@ Keycloak; this app is configured with the resulting `stream-id`.
 | `POST /streams/default/subjects/add` | Add a subject (`{"subject":{"format":"…","email":"…"},"verified":true}`) |
 | `POST /streams/default/subjects/remove` | Remove a subject |
 | `GET  /transmitter/metadata` | Parsed `.well-known/ssf-configuration` document |
+| `GET  /q/metrics`            | Prometheus scrape endpoint (Micrometer) |
 | `POST /ssf/push` | The push endpoint (registered by the extension) |
 
 ## Running
 
 ### 1. Configure Keycloak
 
-You need a Keycloak realm with an OIDC client configured as an SSF receiver,
-and a stream with this app's push endpoint as `delivery.endpoint_url`. Manual
-admin-side setup — this README intentionally does not spin up Keycloak via
-docker-compose / Dev Services so the example stays standalone.
+You need a Keycloak realm with:
 
-See <https://www.keycloak.org/docs/latest/server_admin/#shared-signals-framework>
+1. **An OIDC client** with the `client_credentials` grant enabled and the
+   `ssf.read` + `ssf.manage` scopes attached. The receiver authenticates with
+   this client when calling `/streams/*` on the transmitter.
+2. **A pre-created SSF stream** whose `delivery.endpoint_url` points at this
+   app's push endpoint (`http://localhost:28080/ssf/push` for local dev, or
+   your tunnel URL if Keycloak is remote).
+
+Manual admin-side setup — this README intentionally does not spin up Keycloak
+via docker-compose / Dev Services so the example stays standalone. See
+<https://www.keycloak.org/docs/latest/server_admin/#shared-signals-framework>
 for the realm setup.
 
-The stream's push endpoint must be reachable from Keycloak. For local dev,
-Keycloak should target `http://localhost:28080/ssf/push` (or use a tunnel if
-Keycloak is hosted).
+### 2. Set the environment variables
 
-### 2. Edit `src/main/resources/application.properties`
+| Variable | Required? | Purpose |
+|---|---|---|
+| `SSF_RECEIVER_TRANSMITTER_ISSUER` | yes | The issuer URL of the Keycloak realm, e.g. `https://kc.example/realms/ssf-poc`. |
+| `SSF_RECEIVER_STREAM_ID` | yes | The `stream_id` you got from the Keycloak admin console after creating the stream. |
+| `SSF_RECEIVER_TRANSMITTER_METADATA_URL` | usually | **Keycloak quirk:** Keycloak serves the SSF metadata at `<issuer>/.well-known/ssf-configuration` (OIDC-style suffix), but the SSF §7.2 splice rule the extension uses by default puts it at `<host>/.well-known/ssf-configuration<issuer-path>`. Set this env var to the actual Keycloak URL, e.g. `https://kc.example/realms/ssf-poc/.well-known/ssf-configuration`. |
+| `SSF_RECEIVER_EXPECTED_AUDIENCE` | optional | The `aud` claim this receiver expects on inbound SETs. Defaults to a placeholder. |
+| `SSF_RECEIVER_PUSH_EXPECTED_AUTH_HEADER` | optional | Shared secret enforced on inbound `Authorization`. Uncomment the matching line in `application.properties` to activate. |
+| `KEYCLOAK_AUTH_SERVER_URL` | yes | The OIDC issuer used by `quarkus-oidc-client` to discover the token endpoint — typically the same as `SSF_RECEIVER_TRANSMITTER_ISSUER`. |
+| `KEYCLOAK_TRANSMITTER_MANAGED_CLIENT_ID` | optional | Defaults to `quarkus-ssf-receiver`. Override if your client is registered under a different name. |
+| `KEYCLOAK_TRANSMITTER_MANAGED_CLIENT_SECRET` | yes | The OIDC client secret. Distinct env-var name from `KEYCLOAK_RECEIVER_MANAGED_CLIENT_SECRET` (used by the receiver-managed example) so the two examples can run against separate Keycloak clients. |
 
-```properties
-ssf.receiver.transmitter-issuer=https://<your-keycloak>/realms/<realm>
-ssf.receiver.stream-management=TRANSMITTER
-ssf.receiver.stream-id=<stream id from Keycloak admin>
-ssf.receiver.delivery-method=PUSH
-ssf.receiver.expected-audience=<the audience your stream issues SETs to>
+```sh
+export SSF_RECEIVER_TRANSMITTER_ISSUER=https://kc.example/realms/ssf-poc
+export SSF_RECEIVER_TRANSMITTER_METADATA_URL=https://kc.example/realms/ssf-poc/.well-known/ssf-configuration
+export SSF_RECEIVER_STREAM_ID=<stream-id-from-keycloak-admin>
+export SSF_RECEIVER_EXPECTED_AUDIENCE=https://my.expected.audience.com
 
-# Optional — enforce a shared secret on inbound pushes
-#ssf.receiver.push.expected-auth-header=Bearer <shared-secret>
-
-# Outbound auth for /streams/* and the startup probe
-quarkus.oidc-client.auth-server-url=https://<your-keycloak>/realms/<realm>
-quarkus.oidc-client.client-id=<oidc-client-id>
-quarkus.oidc-client.credentials.secret=<secret>
-quarkus.oidc-client.grant.type=client
-quarkus.oidc-client.scopes=ssf.read,ssf.manage
+export KEYCLOAK_AUTH_SERVER_URL=https://kc.example/realms/ssf-poc
+export KEYCLOAK_TRANSMITTER_MANAGED_CLIENT_SECRET=<client-secret>
 ```
 
-`ssf.receiver.transmitter-metadata-url` and `transmitter-jwks-url` are
-auto-discovered from the issuer; override only if your Keycloak doesn't expose
-the standard `<issuer>/.well-known/ssf-configuration` location.
+The push endpoint must be reachable from Keycloak. For local dev, point the
+stream's `delivery.endpoint_url` at `http://localhost:28080/ssf/push` directly;
+for a remote Keycloak, expose this app via a tunnel
+(`cloudflared tunnel --url http://localhost:28080`) and use the public URL.
 
 ### 3. Run
 
@@ -110,6 +123,22 @@ curl -s -X POST localhost:28080/streams/default/verify | jq
 #   in /events/latest seconds later
 ```
 
+## Running alongside the receiver-managed example
+
+Both examples default to port `28080`. To run them side-by-side, override one:
+
+```sh
+mvn -pl examples/example-receiver-managed-stream quarkus:dev \
+    -Dquarkus.profile=keycloak \
+    -Dquarkus.http.port=28081
+```
+
+The two examples were designed to coexist against the same Keycloak realm —
+they use **distinct client-secret env vars** (`KEYCLOAK_TRANSMITTER_MANAGED_CLIENT_SECRET`
+vs `KEYCLOAK_RECEIVER_MANAGED_CLIENT_SECRET`) so you can register two separate
+OIDC clients with independent audit trails / rate-limits if desired, or reuse
+the same client by setting both env vars to the same value.
+
 ## Metrics
 
 `quarkus-micrometer-registry-prometheus` is on the classpath, so meters are
@@ -122,11 +151,25 @@ curl -s localhost:28080/q/metrics | grep ^ssf_receiver_
 The `event-aliases` and `issuer-aliases` configured in `application.properties`
 become readable Micrometer tag values on `ssf_receiver_events_processed_total`.
 
+## Disable
+
+If you just want to start the app without any SSF activity (e.g. iterating on
+an unrelated REST resource):
+
+```sh
+mvn -pl examples/example-transmitter-managed-stream quarkus:dev -Dssf.receiver.enabled=false
+```
+
+The CDI beans stay wired (so app code that touches `SsfStreamClient` directly
+still works), but no startup probe / push route registration runs.
+
 ## What this example does *not* demonstrate
 
 - Receiver-managed streams — see [`example-receiver-managed-stream`](../example-receiver-managed-stream/).
-- POLL delivery — same example covers it under the `keycloak` profile.
-- Persistence (events are in-memory only).
-- Replay protection / `jti` deduplication.
+- POLL delivery — see the receiver-managed example's `keycloak` profile.
+- Durable persistence — events are buffered in-memory only. The default in-memory
+  `SsfJtiDedupStore` IS active (so duplicate jti's within a single JVM lifetime
+  are dropped), but it's lost on restart; a production receiver would supply
+  its own SPI implementation backed by a database / Redis.
 - Per-event-type CAEP / RISC parsing — `SsfEventToken.events()` and
   `additionalProperties()` give the consumer the raw map.

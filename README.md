@@ -1,7 +1,7 @@
 # quarkus-ssf-receiver
 
-[![Build (JVM)](https://github.com/thomasdarimont/quarkus-ssf-receiver/actions/workflows/build.yml/badge.svg)](.github/workflows/build.yml)
-[![Native build](https://github.com/thomasdarimont/quarkus-ssf-receiver/actions/workflows/native.yml/badge.svg)](.github/workflows/native.yml)
+[![Build (JVM)](https://github.com/easyssf/quarkus-ssf-receiver/actions/workflows/build.yml/badge.svg)](.github/workflows/build.yml)
+[![Native build](https://github.com/easyssf/quarkus-ssf-receiver/actions/workflows/native.yml/badge.svg)](.github/workflows/native.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 A Quarkus extension that lets a Quarkus app act as a [Shared Signals Framework
@@ -13,7 +13,7 @@ custom).
 |---|---|
 | **Status** | Experimental — APIs may change before 1.0. |
 | **License** | [Apache-2.0](LICENSE) |
-| **Java** | 21+ for the extension, 25 for the included examples |
+| **Java** | 21+ (extension and examples both compile under `--release 21`) |
 | **Quarkus** | 3.35.x (floor — see [Compatibility](#compatibility)) |
 | **Group ID** | `com.easyssf` |
 
@@ -39,8 +39,8 @@ custom).
 |---|---|
 | [`runtime/`](runtime/) | Extension runtime: config mapping, `SsfEventHandler` SPI, JWKS resolver, SET verifier, push route, POLL scheduler, stream client, alias resolver, metrics SPI. |
 | [`deployment/`](deployment/) | Build-time processor — registers beans + REST clients, picks the right `TransmitterTokenProvider` at build time, wires Micrometer when present. Also contains the smoke test (signed SET round-trip with a stub JWKS). |
-| [`examples/example-transmitter-managed-stream/`](examples/example-transmitter-managed-stream/) | Runnable Quarkus app — TRANSMITTER mode + PUSH delivery against Keycloak. |
-| [`examples/example-receiver-managed-stream/`](examples/example-receiver-managed-stream/) | Runnable Quarkus app — RECEIVER mode against caep.dev (default) or Keycloak (`-Dquarkus.profile=keycloak`, switches to POLL). |
+| [`examples/example-transmitter-managed-stream/`](examples/example-transmitter-managed-stream/) | Runnable Quarkus app — TRANSMITTER mode + PUSH delivery, env-var-driven (Keycloak by default). |
+| [`examples/example-receiver-managed-stream/`](examples/example-receiver-managed-stream/) | Runnable Quarkus app — RECEIVER mode. Default config is neutral; `-Dquarkus.profile=caepdev` overlays caep.dev (PUSH), `-Dquarkus.profile=keycloak` overlays Keycloak (POLL + OIDC). |
 
 ## Consumer SPI
 
@@ -268,8 +268,8 @@ ssf.receiver.poll.return-immediately=false
 |---|---|---|---|
 | **Quarkus** | 3.35.x | 3.35.0 | Earlier versions may work but aren't tested. CI matrix in `.github/workflows/build.yml` is the source of truth — extend the `quarkus:` axis to add an LTS pin. |
 | **Java (extension)** | 21, 25 | 21 | The runtime + deployment artifacts compile under `--release 21`. Consumers may run on any 21+. |
-| **Java (examples)** | 25 | 25 | Examples target the latest Java to exercise modern APIs; if your Java version is lower, copy the example into a 21-targeted module. |
-| **Native image** | GraalVM 25 (Mandrel-equivalent) | — | The extension compiles native; the built-in CI workflow validates this on every PR for both example apps. |
+| **Java (examples)** | 21 | 21 | Examples inherit the same Java 21 floor so they're copy-pasteable for consumers. |
+| **Native image** | GraalVM 21 (Mandrel-equivalent) | — | The extension compiles native; the built-in CI workflow validates this on every PR for both example apps. |
 
 ## Stream management
 
@@ -477,9 +477,13 @@ or runtime kill-switching via env var.
 
 ```sh
 mvn -DskipTests install                  # build + install all artifacts
-mvn -pl deployment test                  # smoke test (signed SET round-trip)
+mvn -pl runtime,deployment test          # full layer-1 + layer-2 test suite
+
+# Run the examples — see each example's README for the env vars they need.
 mvn -pl examples/example-transmitter-managed-stream quarkus:dev
 mvn -pl examples/example-receiver-managed-stream    quarkus:dev
+mvn -pl examples/example-receiver-managed-stream    quarkus:dev -Dquarkus.profile=caepdev
+mvn -pl examples/example-receiver-managed-stream    quarkus:dev -Dquarkus.profile=keycloak
 ```
 
 ## Out of scope (today)
