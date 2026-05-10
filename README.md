@@ -505,36 +505,72 @@ Scrape at `/q/metrics`.
 
 ## Aliases (`SsfAliases`)
 
-Three independent alias domains keep tag values short and stable:
+`SsfAliases` keeps configuration and observability readable: instead of repeating
+80-character event-type URIs across config, log lines, and Micrometer tags,
+the extension swaps in a short alias name. It's a regular CDI bean, so
+application code can `@Inject` it for the same naming outside the extension's
+own usage.
+
+Three independent alias domains:
 
 ```properties
-# Event-type URI → short alias (built-in defaults exist for SSF spec types)
-ssf.receiver.event-aliases.CaepSessionRevoked=https://schemas.openid.net/secevent/caep/event-type/session-revoked
-ssf.receiver.event-aliases.CaepCredentialChange=https://schemas.openid.net/secevent/caep/event-type/credential-change
+# 1. Event-type URI → short alias. Built-ins cover SSF + CAEP + RISC out of
+#    the box (see table below); the lines here are only for vendor-specific
+#    URIs the spec doesn't cover.
+ssf.receiver.event-aliases.VendorWidgetReplaced=https://schemas.example.org/vendor/event-type/widget-replaced
 
-# Transmitter issuer URL → short alias (no built-ins)
+# 2. Transmitter issuer URL → short alias. No built-ins.
 ssf.receiver.issuer-aliases.CaepDev=https://ssf.caep.dev
 ssf.receiver.issuer-aliases.MyTransmitter=https://transmitter.example
 
-# This receiver's own short name — surfaces as the `receiver` tag.
-# Falls back to expected-audience, then "unknown".
+# 3. This receiver's own short name — surfaces as the `receiver` tag on
+#    Micrometer meters. Falls back to expected-audience, then "unknown".
 ssf.receiver.alias=my-receiver
 ```
 
-**Built-in event-type aliases** (covered out of the box, no config needed):
+### Where aliases show up
 
-| Spec | URIs of the form `…/secevent/<spec>/event-type/<name>` | Aliases |
+| Surface | Behavior |
+|---|---|
+| **Handler code** (`SsfEventContext`) | `eventContext.hasEvent("CaepSessionRevoked")` and `eventContext.eventFor(...)` accept either an alias or a full URI. `eventContext.issAlias()` and `eventContext.eventsByAlias()` expose the resolved view directly. |
+| **Config** (`ssf.receiver.events-requested`) | Each entry can be a URI or an alias. Unknown aliases fail fast at startup with a list of registered names. |
+| **Metrics** (`ssf.receiver.events.processed`) | The `event`, `iss`, and `receiver` tags are alias values, so Prometheus / Grafana don't show URIs. |
+| **Logs** | `LoggingSsfEventHandler` and the registrar / probe startup lines emit alias-resolved values. |
+
+### Built-in event-type aliases
+
+Covered out of the box — no config needed.
+
+| Spec | URI suffix (under `…/secevent/<spec>/event-type/`) | Aliases |
 |---|---|---|
 | **OpenID SSF** | `verification`, `stream-updated` | `SsfStreamVerification`, `SsfStreamUpdated` |
 | **OpenID CAEP 1.0** | `session-revoked`, `token-claims-change`, `credential-change`, `assurance-level-change`, `device-compliance-change`, `session-established`, `session-presented`, `risk-level-change` | `CaepSessionRevoked`, `CaepTokenClaimsChange`, `CaepCredentialChange`, `CaepAssuranceLevelChange`, `CaepDeviceComplianceChange`, `CaepSessionEstablished`, `CaepSessionPresented`, `CaepRiskLevelChange` |
 | **OpenID RISC 1.0** | `account-credential-change-required`, `account-purged`, `account-disabled`, `account-enabled`, `identifier-changed`, `identifier-recycled`, `credential-compromise`, `opt-in`, `opt-out-initiated`, `opt-out-cancelled`, `opt-out-effective`, `recovery-activated`, `recovery-information-changed` | `RiscAccountCredentialChangeRequired`, `RiscAccountPurged`, `RiscAccountDisabled`, `RiscAccountEnabled`, `RiscIdentifierChanged`, `RiscIdentifierRecycled`, `RiscCredentialCompromise`, `RiscOptIn`, `RiscOptOutInitiated`, `RiscOptOutCancelled`, `RiscOptOutEffective`, `RiscRecoveryActivated`, `RiscRecoveryInformationChanged` |
 
-Consumer entries in `ssf.receiver.event-aliases.*` overlay the built-ins —
-a user mapping for a built-in URI replaces the alias.
+Consumer entries in `ssf.receiver.event-aliases.*` **overlay** the built-ins —
+a user mapping for a built-in URI replaces the alias name (the URI itself
+stays the same).
 
-`SsfAliases` is a regular CDI bean — `@Inject` it into your own resources / log
-lines / handlers if you want the same naming outside metrics. Unknown URIs
-fall through unchanged so nothing is ever lost.
+### Bean API
+
+```java
+@Inject SsfAliases aliases;
+
+aliases.eventTypeAlias(uri);    // URI  → alias (or URI passthrough if unknown)
+aliases.issuerAlias(issUrl);    // URL  → alias (or URL passthrough if unknown)
+aliases.receiverAlias();        // this receiver's short name; never empty
+
+aliases.resolveEventTypeRef("CaepSessionRevoked"); // alias  → URI
+aliases.resolveEventTypeRef("https://…");          // URI    → URI (passthrough)
+// Unknown alias → IllegalArgumentException listing the registered set.
+
+aliases.eventTypeAliasesByUri();  // read-only view (Dev UI uses this)
+aliases.issuerAliasesByUri();
+```
+
+Unknown URIs fall through unchanged from the lookup methods — nothing is
+ever lost. Only `resolveEventTypeRef` throws, since its caller (the config
+validator) needs to surface typos eagerly.
 
 ## Disable switch
 
