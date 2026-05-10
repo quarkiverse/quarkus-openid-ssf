@@ -1,10 +1,20 @@
 name: Native build
 
+# paths-ignore skips push/PR triggers when ONLY docs changed. The weekly cron
+# below ignores paths-ignore — drift detection still runs regardless.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - 'design/**'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - 'design/**'
   schedule:
     # Weekly run catches drift when transitive Quarkus / Mandrel releases
     # change native compatibility under our feet.

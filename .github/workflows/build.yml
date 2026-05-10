@@ -1,10 +1,24 @@
 name: Build (JVM)
 
+# paths-ignore skips CI when ONLY these files changed. Any commit that also
+# touches code (pom.xml, *.java, *.properties, workflow YAMLs, etc.) still
+# runs the build. Caveat: if you make this workflow a required status check
+# under branch protection, paths-ignore can block PRs that touch only docs —
+# either keep the check non-required, or move to the "dispatch + dummy ok job"
+# pattern from https://github.com/orgs/community/discussions/13690.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - 'design/**'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - 'design/**'
 
 # Cancel in-flight runs on the same ref when a new push lands.
 concurrency:
