@@ -25,8 +25,8 @@ import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfAliases;
-import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventHandler;
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventContext;
+import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventHandler;
 
 @ApplicationScoped
 public class CapturingSsfEventHandler implements SsfEventHandler {

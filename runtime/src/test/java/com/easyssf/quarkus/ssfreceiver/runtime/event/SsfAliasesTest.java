@@ -309,4 +309,77 @@ class SsfAliasesTest {
             assertThat(aliases.receiverAlias(), equalTo("https://my-app.example"));
         }
     }
+
+    @Nested
+    @DisplayName("resolveEventTypeRef")
+    class ResolveEventTypeRef {
+
+        @Test
+        @DisplayName("Built-in alias resolves to its URI")
+        void builtInAlias() {
+            SsfAliases aliases = newAliases(configWith(
+                    Collections.emptyMap(), Collections.emptyMap(),
+                    Optional.empty(), Optional.empty()));
+
+            assertThat(aliases.resolveEventTypeRef("CaepSessionRevoked"),
+                    equalTo(URI.create(SESSION_REVOKED_URI)));
+            assertThat(aliases.resolveEventTypeRef("RiscAccountDisabled"),
+                    equalTo(URI.create("https://schemas.openid.net/secevent/risc/event-type/account-disabled")));
+        }
+
+        @Test
+        @DisplayName("Consumer-configured alias resolves to its URI")
+        void consumerConfiguredAlias() {
+            String customUri = "https://schemas.example.org/vendor/event-type/foo";
+            Map<String, URI> userAliases = new LinkedHashMap<>();
+            userAliases.put("VendorFoo", URI.create(customUri));
+
+            SsfAliases aliases = newAliases(configWith(
+                    userAliases, Collections.emptyMap(),
+                    Optional.empty(), Optional.empty()));
+
+            assertThat(aliases.resolveEventTypeRef("VendorFoo"), equalTo(URI.create(customUri)));
+        }
+
+        @Test
+        @DisplayName("Full URI passes through verbatim")
+        void uriPassesThrough() {
+            SsfAliases aliases = newAliases(configWith(
+                    Collections.emptyMap(), Collections.emptyMap(),
+                    Optional.empty(), Optional.empty()));
+
+            String customUri = "https://schemas.example.org/vendor/event-type/never-aliased";
+            assertThat(aliases.resolveEventTypeRef(customUri), equalTo(URI.create(customUri)));
+        }
+
+        @Test
+        @DisplayName("Unknown alias throws IllegalArgumentException naming the registered set")
+        void unknownAliasThrows() {
+            SsfAliases aliases = newAliases(configWith(
+                    Collections.emptyMap(), Collections.emptyMap(),
+                    Optional.empty(), Optional.empty()));
+
+            IllegalArgumentException ex = org.junit.jupiter.api.Assertions
+                    .assertThrows(IllegalArgumentException.class,
+                            () -> aliases.resolveEventTypeRef("CaepSesssionRevoked")); // typo: extra 's'
+
+            // Message points at the bad input AND lists the registered names
+            // so the operator can spot the typo.
+            assertThat(ex.getMessage(), org.hamcrest.Matchers.containsString("CaepSesssionRevoked"));
+            assertThat(ex.getMessage(), org.hamcrest.Matchers.containsString("CaepSessionRevoked"));
+        }
+
+        @Test
+        @DisplayName("Blank / null input throws IllegalArgumentException")
+        void blankInputThrows() {
+            SsfAliases aliases = newAliases(configWith(
+                    Collections.emptyMap(), Collections.emptyMap(),
+                    Optional.empty(), Optional.empty()));
+
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                    () -> aliases.resolveEventTypeRef(null));
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                    () -> aliases.resolveEventTypeRef("   "));
+        }
+    }
 }

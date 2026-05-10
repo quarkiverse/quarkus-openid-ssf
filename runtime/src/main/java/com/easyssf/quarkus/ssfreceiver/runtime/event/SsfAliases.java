@@ -15,8 +15,11 @@
  */
 package com.easyssf.quarkus.ssfreceiver.runtime.event;
 
+import java.net.URI;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
 import jakarta.annotation.PostConstruct;
@@ -159,5 +162,55 @@ public class SsfAliases {
         }
         String alias = table.get(uri);
         return alias != null ? alias : uri;
+    }
+
+    /**
+     * Resolves an entry from {@code ssf.receiver.events-requested} to its
+     * event-type URI. Inputs containing a URI scheme ({@code "scheme:"}) are
+     * returned verbatim; anything else is treated as an alias name and
+     * looked up in the event-type alias table.
+     *
+     * @throws IllegalArgumentException if {@code aliasOrUri} doesn't look like a
+     *         URI and isn't registered as an event-type alias. The message
+     *         lists every registered alias to help the operator spot typos.
+     */
+    public URI resolveEventTypeRef(String aliasOrUri) {
+        if (aliasOrUri == null || aliasOrUri.isBlank()) {
+            throw new IllegalArgumentException("event-type ref must not be blank");
+        }
+        String trimmed = aliasOrUri.trim();
+        if (looksLikeUri(trimmed)) {
+            return URI.create(trimmed);
+        }
+        // Alias path — search the URI -> alias table for a matching alias.
+        for (Map.Entry<String, String> entry : uriToEventAlias.entrySet()) {
+            if (trimmed.equals(entry.getValue())) {
+                return URI.create(entry.getKey());
+            }
+        }
+        Set<String> known = new TreeSet<>(uriToEventAlias.values());
+        throw new IllegalArgumentException(
+                "Unknown event-type alias '" + trimmed + "'. Either supply a full URI "
+                        + "or register the alias via ssf.receiver.event-aliases.<alias>=<uri>. "
+                        + "Built-in + configured aliases: " + known);
+    }
+
+    /** True if the value has a URI scheme (e.g. {@code https:}, {@code urn:}). */
+    private static boolean looksLikeUri(String value) {
+        int colon = value.indexOf(':');
+        if (colon <= 0) {
+            return false;
+        }
+        // RFC 3986 scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
+        if (!Character.isLetter(value.charAt(0))) {
+            return false;
+        }
+        for (int i = 1; i < colon; i++) {
+            char c = value.charAt(i);
+            if (!Character.isLetterOrDigit(c) && c != '+' && c != '-' && c != '.') {
+                return false;
+            }
+        }
+        return true;
     }
 }

@@ -46,8 +46,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import com.easyssf.quarkus.ssfreceiver.runtime.delivery.poll.SsfPoller;
-import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventHandler;
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventContext;
+import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventHandler;
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventToken;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.WireMock;

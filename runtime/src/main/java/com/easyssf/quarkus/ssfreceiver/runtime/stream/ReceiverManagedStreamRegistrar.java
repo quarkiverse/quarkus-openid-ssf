@@ -308,11 +308,18 @@ public class ReceiverManagedStreamRegistrar {
     }
 
     private StreamConfiguration buildCreateRequest(URI deliveryUrl) {
-        List<URI> eventsRequested = config.eventsRequested().orElse(List.of());
-        if (eventsRequested.isEmpty()) {
+        List<String> rawEntries = config.eventsRequested().orElse(List.of());
+        if (rawEntries.isEmpty()) {
             throw new IllegalStateException(
-                    "ssf.receiver.events-requested must list at least one event URI when stream-management=RECEIVER");
+                    "ssf.receiver.events-requested must list at least one event URI or alias when stream-management=RECEIVER");
         }
+        // Each entry is either a URI (passes through) or an alias (resolved
+        // via SsfAliases). Unknown aliases throw IllegalArgumentException
+        // with a list of registered names — we let that bubble up so the
+        // operator's typo gets a clear, actionable error.
+        List<URI> eventsRequested = rawEntries.stream()
+                .map(aliases::resolveEventTypeRef)
+                .toList();
         // PUSH: receiver dictates delivery.endpoint_url. POLL: transmitter assigns it,
         // so we send the method only.
         StreamConfiguration.Delivery delivery = new StreamConfiguration.Delivery(

@@ -39,8 +39,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventHandler;
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventContext;
+import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventHandler;
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventToken;
 import com.easyssf.quarkus.ssfreceiver.runtime.metadata.SsfConfigurationResolver;
 import com.easyssf.quarkus.ssfreceiver.runtime.metadata.SsfTransmitterMetadata;

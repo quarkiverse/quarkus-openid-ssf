@@ -161,8 +161,8 @@ ssf.receiver.stream-management=RECEIVER
 ssf.receiver.delivery-method=PUSH                               # or POLL
 ssf.receiver.push.delivery-endpoint-url=https://my-app.example/ssf/push
 ssf.receiver.expected-audience=https://my-app.example
-ssf.receiver.events-requested=\
-    https://schemas.openid.net/secevent/caep/event-type/session-revoked
+# Built-in CAEP / RISC aliases work directly; full URIs are also accepted.
+ssf.receiver.events-requested=CaepSessionRevoked,CaepCredentialChange
 # Optional — defaults shown.
 ssf.receiver.receiver-managed.register-stream=true
 ssf.receiver.receiver-managed.delete-on-shutdown=false

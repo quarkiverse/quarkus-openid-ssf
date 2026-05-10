@@ -140,8 +140,25 @@ public interface SsfReceiverConfig {
      * {@code events_requested} field of the create-stream request). Informational
      * for transmitter-managed streams — the transmitter (e.g. Keycloak admin)
      * already controls the actual subscription set.
+     *
+     * <p>
+     * Each entry can be a full URI (e.g.
+     * {@code https://schemas.openid.net/secevent/caep/event-type/session-revoked})
+     * or a short alias registered with {@link #eventAliases() event-aliases}
+     * — including the SSF / CAEP / RISC built-ins (e.g. {@code CaepSessionRevoked},
+     * {@code RiscAccountDisabled}). Resolution is performed by
+     * {@code com.easyssf.quarkus.ssfreceiver.runtime.event.SsfAliases#resolveEventTypeRef(String)}
+     * at startup; an unregistered name fails fast with a list of available aliases.
+     *
+     * <p>
+     * Example:
+     *
+     * <pre>
+     * ssf.receiver.events-requested=CaepSessionRevoked,CaepCredentialChange,\
+     *     https://schemas.example.org/vendor/event-type/x
+     * </pre>
      */
-    Optional<List<URI>> eventsRequested();
+    Optional<List<String>> eventsRequested();
 
     /**
      * Short aliases for event-type URIs — used as the {@code event} tag value on

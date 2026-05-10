@@ -34,8 +34,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventHandler;
 import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventContext;
+import com.easyssf.quarkus.ssfreceiver.runtime.event.SsfEventHandler;
 
 import io.quarkus.test.QuarkusExtensionTest;
 import io.restassured.RestAssured;

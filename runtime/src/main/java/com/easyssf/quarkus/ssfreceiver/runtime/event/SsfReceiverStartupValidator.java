@@ -15,6 +15,8 @@
  */
 package com.easyssf.quarkus.ssfreceiver.runtime.event;
 
+import java.util.List;
+
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -33,6 +35,9 @@ public class SsfReceiverStartupValidator {
 
     @Inject
     SsfReceiverConfig config;
+
+    @Inject
+    SsfAliases aliases;
 
     void onStart(@Observes @Priority(100) StartupEvent event) {
         if (!config.enabled()) {
@@ -57,11 +62,27 @@ public class SsfReceiverStartupValidator {
                 }
                 if (config.receiverManaged().registerStream()
                         && config.streamId().isEmpty()
-                        && config.eventsRequested().map(java.util.List::isEmpty).orElse(true)) {
+                        && config.eventsRequested().map(List::isEmpty).orElse(true)) {
                     throw new IllegalStateException(
-                            "ssf.receiver.events-requested must list at least one event URI when "
+                            "ssf.receiver.events-requested must list at least one event URI or alias when "
                                     + "stream-management=RECEIVER and the extension is asked to register a stream");
                 }
+            }
+        }
+        // Resolve every events-requested entry up-front (regardless of mode)
+        // so a typo in an alias name fails immediately at startup with a
+        // helpful message, rather than silently being sent to the transmitter
+        // as a non-URI string. Resolution is cheap and idempotent.
+        config.eventsRequested().ifPresent(this::validateEventsRequested);
+    }
+
+    private void validateEventsRequested(List<String> entries) {
+        for (String entry : entries) {
+            try {
+                aliases.resolveEventTypeRef(entry);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalStateException(
+                        "ssf.receiver.events-requested contains an invalid entry: " + e.getMessage(), e);
             }
         }
     }
