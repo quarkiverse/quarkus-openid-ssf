@@ -24,6 +24,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
+
+import jakarta.annotation.PostConstruct;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -50,12 +53,40 @@ public class SetVerifier {
     @Inject
     JwksResolver jwks;
 
+    private Set<JWSAlgorithm> acceptedAlgorithms;
+    private int minRsaKeySize;
+
+    @PostConstruct
+    void init() {
+        SsfReceiverConfig.SetValidation val = config.setValidation();
+        this.acceptedAlgorithms = val.acceptedAlgorithms().stream()
+                .filter(s -> s != null && !s.isBlank())
+                .map(String::trim)
+                .map(JWSAlgorithm::parse)
+                .collect(Collectors.toUnmodifiableSet());
+        if (this.acceptedAlgorithms.isEmpty()) {
+            throw new IllegalStateException(
+                    "ssf.receiver.set-validation.accepted-algorithms must list at least one JWS alg "
+                            + "(default is [RS256] per CAEP Interop §3.1)");
+        }
+        this.minRsaKeySize = Math.max(0, val.minRsaKeySize());
+    }
+
     public SsfEventToken verify(String setJwt) throws SsfVerificationException {
         SignedJWT jwt;
         try {
             jwt = SignedJWT.parse(setJwt);
         } catch (ParseException e) {
             throw new SsfVerificationException("SET could not be parsed as a signed JWT", e);
+        }
+
+        // Reject out-of-allowlist alg BEFORE looking up the key — defends
+        // against alg-substitution attacks (e.g. RS256 → HS256 with the
+        // RSA public key being used as an HMAC secret).
+        JWSAlgorithm alg = jwt.getHeader().getAlgorithm();
+        if (alg == null || !acceptedAlgorithms.contains(alg)) {
+            throw new SsfVerificationException("SET alg " + alg
+                    + " is not in ssf.receiver.set-validation.accepted-algorithms " + acceptedAlgorithms);
         }
 
         String kid = jwt.getHeader().getKeyID();
@@ -68,8 +99,24 @@ public class SetVerifier {
             throw new SsfVerificationException("No JWK found for kid " + kid);
         }
 
+        if (minRsaKeySize > 0 && key instanceof RSAKey rsa) {
+            int bits;
+            try {
+                bits = rsa.toRSAPublicKey().getModulus().bitLength();
+            } catch (JOSEException e) {
+                throw new SsfVerificationException(
+                        "Could not inspect RSA key size for kid " + kid, e);
+            }
+            if (bits < minRsaKeySize) {
+                throw new SsfVerificationException(
+                        "SET signing key for kid " + kid + " is " + bits
+                                + "-bit RSA; minimum is " + minRsaKeySize + " bits "
+                                + "(ssf.receiver.set-validation.min-rsa-key-size)");
+            }
+        }
+
         try {
-            if (!jwt.verify(verifierFor(key, jwt.getHeader().getAlgorithm()))) {
+            if (!jwt.verify(verifierFor(key, alg))) {
                 throw new SsfVerificationException("SET signature did not verify");
             }
         } catch (JOSEException e) {

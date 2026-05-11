@@ -131,6 +131,15 @@ public interface SsfReceiverConfig {
     Dedup dedup();
 
     /**
+     * Validation policy for inbound SETs — accepted JWS signature
+     * algorithms, minimum key sizes, and (future) claim-level checks.
+     * See {@link SetValidation}. Distinct from SSF Stream Verification
+     * (which is an event-flow concept — see
+     * {@code SsfStreamClient.requestVerification}).
+     */
+    SetValidation setValidation();
+
+    /**
      * Configuration for transmitter-managed stream startup probing. Only consulted when {@link #streamManagement()} is
      * {@link StreamManagement#TRANSMITTER}.
      */
@@ -389,6 +398,33 @@ public interface SsfReceiverConfig {
          */
         @WithDefault("10000")
         int capacity();
+    }
+
+    /**
+     * Validation policy for inbound SETs. Defaults match the CAEP 1.0
+     * Interoperability Profile, which mandates RS256 with at least 2048-bit
+     * keys. Broaden the allowlist if the transmitter signs with other
+     * algorithms (ES256, EdDSA, …) and you've accepted that you fall
+     * outside strict CAEP-Interop conformance.
+     */
+    interface SetValidation {
+        /**
+         * Allowed JWS {@code alg} values on inbound SETs. Any SET whose
+         * header advertises an algorithm outside this list is rejected
+         * before signature verification — defense against alg-substitution
+         * attacks. Default is {@code [RS256]} (CAEP Interop §3.1).
+         */
+        @WithDefault("RS256")
+        List<String> acceptedAlgorithms();
+
+        /**
+         * Minimum RSA key size, in bits, accepted for SET signature
+         * verification. SETs signed with an RSA JWK whose modulus is shorter
+         * than this are rejected. Default is {@code 2048} (CAEP Interop §3.1).
+         * Set to {@code 0} to disable the check (not recommended).
+         */
+        @WithDefault("2048")
+        int minRsaKeySize();
     }
 
     interface TransmitterManaged {

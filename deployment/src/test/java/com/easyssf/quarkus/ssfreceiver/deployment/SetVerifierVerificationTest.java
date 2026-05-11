@@ -50,6 +50,7 @@ public class SetVerifierVerificationTest {
     private static final String PROP_MISSING_IAT_SET = "test.ssf.missing-iat-set";
     private static final String PROP_MISSING_JTI_SET = "test.ssf.missing-jti-set";
     private static final String PROP_UNKNOWN_KID_SET = "test.ssf.unknown-kid-set";
+    private static final String PROP_RS384_SET = "test.ssf.rs384-set";
 
     @RegisterExtension
     static final QuarkusExtensionTest TEST = new QuarkusExtensionTest()
@@ -67,6 +68,7 @@ public class SetVerifierVerificationTest {
                 System.clearProperty(PROP_MISSING_IAT_SET);
                 System.clearProperty(PROP_MISSING_JTI_SET);
                 System.clearProperty(PROP_UNKNOWN_KID_SET);
+                System.clearProperty(PROP_RS384_SET);
             })
             .overrideConfigKey("ssf.receiver.transmitter-issuer", ISSUER)
             .overrideConfigKey("ssf.receiver.expected-audience", AUDIENCE)
@@ -126,9 +128,33 @@ public class SetVerifierVerificationTest {
                     JwksWireMock.canonicalClaims(ISSUER, AUDIENCE).build(),
                     JwksWireMock.rsaKey(), "unknown-kid-not-in-jwks");
             System.setProperty(PROP_UNKNOWN_KID_SET, unknownKidSet);
+
+            // 7. Signed with RS384 (the JWKS key is RSA, so the signature would
+            //    verify) — but RS384 isn't in the default set-validation
+            //    accepted-algorithms allowlist [RS256], so the verifier rejects
+            //    it before signature check (CAEP Interop §3.1).
+            System.setProperty(PROP_RS384_SET,
+                    signWithAlg(JwksWireMock.canonicalClaims(ISSUER, AUDIENCE).build(),
+                            JwksWireMock.rsaKey(), JwksWireMock.kid(),
+                            com.nimbusds.jose.JWSAlgorithm.RS384));
         } catch (Exception e) {
             throw new IllegalStateException("Failed to mint verification variants", e);
         }
+    }
+
+    /** Sign a SET with an arbitrary JWS alg — JwksWireMock.signClaims always uses RS256. */
+    private static String signWithAlg(
+            com.nimbusds.jwt.JWTClaimsSet claims,
+            com.nimbusds.jose.jwk.RSAKey signingKey,
+            String kid,
+            com.nimbusds.jose.JWSAlgorithm alg) throws Exception {
+        com.nimbusds.jose.JWSHeader header = new com.nimbusds.jose.JWSHeader.Builder(alg)
+                .type(new com.nimbusds.jose.JOSEObjectType("secevent+jwt"))
+                .keyID(kid)
+                .build();
+        com.nimbusds.jwt.SignedJWT jwt = new com.nimbusds.jwt.SignedJWT(header, claims);
+        jwt.sign(new com.nimbusds.jose.crypto.RSASSASigner(signingKey.toRSAPrivateKey()));
+        return jwt.serialize();
     }
 
     @BeforeAll
@@ -194,6 +220,12 @@ public class SetVerifierVerificationTest {
                 .post("/ssf/push")
                 .then()
                 .statusCode(400);
+    }
+
+    @Test
+    @DisplayName("SET signed with RS384 → 400 (alg not in accepted-algorithms allowlist; CAEP Interop §3.1 → RS256 only)")
+    void disallowedAlgorithmRejected() {
+        postAndExpect400(System.getProperty(PROP_RS384_SET));
     }
 
     @Test
