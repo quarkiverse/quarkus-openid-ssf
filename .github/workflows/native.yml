@@ -1,18 +1,19 @@
 name: Native build
 
-# paths-ignore skips push/PR triggers when ONLY docs changed. The weekly cron
-# below ignores paths-ignore — drift detection still runs regardless.
 on:
   push:
-    branches: [main]
+    branches: [ main ]
     paths-ignore:
       - '**.md'
+      - '**.adoc'
+      - '**.txt'
       - 'LICENSE'
       - 'design/**'
   pull_request:
-    branches: [main]
     paths-ignore:
       - '**.md'
+      - '**.adoc'
+      - '**.txt'
       - 'LICENSE'
       - 'design/**'
   schedule:
@@ -20,59 +21,58 @@ on:
     # change native compatibility under our feet.
     - cron: '17 6 * * 1'
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
-  native-compile:
-    name: Native compile · ${{ matrix.example }}
-    runs-on: ubuntu-latest
+  build-native:
+    name: Native · ${{ matrix.example }}
     strategy:
       fail-fast: false
       matrix:
         # Native builds are slow (~5–10 min each) so we only check the two
         # consumer apps. If they compile, the extension's bytecode is
-        # native-image-friendly. Adding a runtime-level smoke test would
-        # require a separate test app; tracked as a follow-up.
+        # native-image-friendly.
         example:
           - example-transmitter-managed-stream
           - example-receiver-managed-stream
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # graalvm-community is the open-source Mandrel-equivalent; the version
-      # tracks the Quarkus platform in pom.xml. Bump together when Quarkus
-      # bumps its required GraalVM version.
-      - name: Set up GraalVM 21
-        uses: graalvm/setup-graalvm@v1
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: graalvm-community
-          cache: maven
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          distribution: temurin
+          java-version: 21
+          cache: 'maven'
 
-      # Install the runtime + deployment artifacts first so the example
-      # build can resolve them locally.
-      - name: Install runtime + deployment
-        run: mvn --batch-mode --no-transfer-progress -DskipTests -pl runtime,deployment install
+      # Install the extension first so the example build can resolve it locally.
+      - name: Install extension
+        run: mvn -B -DskipTests -Dno-format -pl receiver/runtime,receiver/deployment install
 
-      - name: Native compile
+      - name: Native build
         run: |
-          mvn --batch-mode --no-transfer-progress \
-            -DskipTests \
-            -pl examples/${{ matrix.example }} \
+          mvn -B -DskipTests -Dno-format \
+            -pl receiver/examples/${{ matrix.example }} \
             -am \
             -Pnative \
+            -Dquarkus.native.container-build \
             package
 
-      # Surface the binary's size / linkage in the run log so any sudden
-      # explosion is visible at a glance.
       - name: Inspect native binary
         run: |
-          BIN=$(find examples/${{ matrix.example }}/target -maxdepth 2 -type f -perm -u+x ! -name "*.jar" ! -name "*.so" | head -n1)
+          BIN=$(find receiver/examples/${{ matrix.example }}/target -maxdepth 2 -type f -perm -u+x ! -name "*.jar" ! -name "*.so" | head -n1)
           if [ -z "$BIN" ]; then
-            echo "::error::No native binary produced under examples/${{ matrix.example }}/target/"
+            echo "::error::No native binary produced under receiver/examples/${{ matrix.example }}/target/"
             exit 1
           fi
           echo "Native binary: $BIN"

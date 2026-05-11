@@ -3,12 +3,24 @@
   <component name="Encoding">
     <file url="file://$PROJECT_DIR$/deployment/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/deployment/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/docs/modules/ROOT/examples" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/docs/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/example/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/example/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/examples/example-receiver-managed-stream/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/examples/example-receiver-managed-stream/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/examples/example-transmitter-managed-stream/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/examples/example-transmitter-managed-stream/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/receiver/deployment/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/receiver/deployment/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/receiver/examples/example-receiver-managed-stream/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/receiver/examples/example-receiver-managed-stream/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/receiver/examples/example-transmitter-managed-stream/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/receiver/examples/example-transmitter-managed-stream/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/receiver/runtime/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/receiver/runtime/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/receiver/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/receiver/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/runtime/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/runtime/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />

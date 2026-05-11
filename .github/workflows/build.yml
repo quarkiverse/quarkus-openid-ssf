@@ -1,91 +1,61 @@
-name: Build (JVM)
+name: Build
 
-# paths-ignore skips CI when ONLY these files changed. Any commit that also
-# touches code (pom.xml, *.java, *.properties, workflow YAMLs, etc.) still
-# runs the build. Caveat: if you make this workflow a required status check
-# under branch protection, paths-ignore can block PRs that touch only docs —
-# either keep the check non-required, or move to the "dispatch + dummy ok job"
-# pattern from https://github.com/orgs/community/discussions/13690.
 on:
   push:
-    branches: [main]
+    branches:
+      - "main"
     paths-ignore:
-      - '**.md'
+      - '.gitignore'
+      - 'CODEOWNERS'
       - 'LICENSE'
+      - '*.md'
+      - '*.adoc'
+      - '*.txt'
+      - '.all-contributorsrc'
       - 'design/**'
   pull_request:
-    branches: [main]
     paths-ignore:
-      - '**.md'
+      - '.gitignore'
+      - 'CODEOWNERS'
       - 'LICENSE'
+      - '*.md'
+      - '*.adoc'
+      - '*.txt'
+      - '.all-contributorsrc'
       - 'design/**'
 
-# Cancel in-flight runs on the same ref when a new push lands.
+permissions:
+  contents: read
+  pull-requests: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
-    name: Java ${{ matrix.java }} · Quarkus ${{ matrix.quarkus }}
-    runs-on: ubuntu-latest
+    name: JDK ${{ matrix.java-version }}
     strategy:
       fail-fast: false
       matrix:
-        # 21 = the extension floor (runtime + deployment compile here).
-        # 25 = the example apps' target.
-        # Both must pass — the parent pom's <maven.compiler.release>21</> applies
-        # to the extension regardless of which JDK the build runs on.
-        java: ['21', '25']
-        # Quarkus version matrix: pin to a few representative releases so we
-        # catch breaking changes early. The parent pom's default is the
-        # leftmost entry; CI overrides via -Dquarkus.platform.version=…
-        # for the others. Bump this list as new Quarkus versions ship.
-        quarkus: ['3.35.2']
-        # If you want to add LTS / next checks, append entries here, e.g.:
-        #   quarkus: ['3.35.2', '3.20.5', '3.40.0.CR1']
+        os: [ ubuntu-latest ]
+        # 21 is the extension floor; 25 catches issues on the LTS that
+        # consumer apps are most likely to run on.
+        java-version: [ 21, 25 ]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up JDK ${{ matrix.java }}
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: ${{ matrix.java }}
-          cache: maven
+          java-version: ${{ matrix.java-version }}
+          cache: 'maven'
 
-      # `mvn install` triggers the verify phase, which fires:
-      #   - license:check  (fails on missing Apache-2.0 headers)
-      #   - spotless:check (fails on import-order / formatter drift)
-      # plus the deployment module's smoke test (signed SET round-trip).
-      - name: Build + verify
-        run: |
-          mvn --batch-mode --no-transfer-progress -Dstyle.color=always \
-            -Dquarkus.platform.version=${{ matrix.quarkus }} \
-            install
-
-      - name: Smoke test
-        run: |
-          mvn --batch-mode --no-transfer-progress -Dstyle.color=always \
-            -Dquarkus.platform.version=${{ matrix.quarkus }} \
-            -pl deployment test
-
-  format-check:
-    name: Format + license headers
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-
-      # Direct invocation gives a cleaner failure message than waiting for the
-      # verify-bound execution to fail mid-build. Run on every PR; the fix is
-      # always `mvn spotless:apply && mvn license:format`.
-      - name: Spotless check
-        run: mvn --batch-mode --no-transfer-progress spotless:check
-
-      - name: License header check
-        run: mvn --batch-mode --no-transfer-progress license:check
+      - name: Build with Maven
+        run: mvn -B clean install -Dno-format

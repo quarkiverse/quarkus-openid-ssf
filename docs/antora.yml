@@ -1,0 +1,5 @@
+name: quarkus-openid-ssf
+title: Quarkus OpenID SSF
+version: dev
+nav:
+  - modules/ROOT/nav.adoc

@@ -1,0 +1,27 @@
+site:
+  title: Quarkus OpenID SSF
+  start_page: quarkus-openid-ssf:ROOT:index.adoc
+content:
+  sources:
+  - url: ./../
+    branches: HEAD
+    start_path: docs
+ui:
+  bundle:
+    url: https://github.com/quarkiverse/antora-ui-quarkiverse/releases/latest/download/ui-bundle.zip
+    snapshot: true
+
+asciidoc:
+  extensions:
+    - asciidoctor-kroki
+  attributes:
+    kroki-fetch-diagram: true
+    page-related-doc-categories: security,oidc,identity
+    page-pagination: ''
+    hide-uri-scheme: '@'
+    tabs-sync-option: '@'
+    chomp: 'all'
+    stem: 'asciimath'
+
+output:
+  dir: ./target/site

@@ -1,0 +1,119 @@
+= Quarkus OpenID SSF
+:extension-status: experimental
+
+include::./includes/attributes.adoc[]
+
+A Quarkus extension family for the
+https://openid.net/specs/openid-sharedsignals-framework-1_0.html[OpenID
+Shared Signals Framework (SSF)] and its companion specs
+(https://openid.net/specs/openid-caep-1_0-final.html[CAEP],
+https://openid.net/specs/openid-risc-1_0-final.html[RISC],
+https://www.rfc-editor.org/rfc/rfc8417[RFC 8417 Security Event Tokens],
+https://www.rfc-editor.org/rfc/rfc8935[RFC 8935 PUSH delivery],
+https://www.rfc-editor.org/rfc/rfc8936[RFC 8936 POLL delivery]).
+
+Today the project ships a single extension — the **receiver**. Sibling
+extensions (transmitter etc.) will land alongside as they're built.
+
+[[receiver]]
+== Receiver
+
+Lets a Quarkus app act as an SSF receiver against any spec-compliant
+transmitter — public providers like
+https://ssf.caep.dev[caep.dev], on-prem / self-hosted IdPs, or custom
+implementations.
+
+=== What it does
+
+* Accepts inbound SETs via **PUSH** (RFC 8935) on a Vert.x route at `/ssf/push`.
+* Pulls SETs via **POLL** (RFC 8936) on a periodic Vert.x timer, with a
+  manual `pollNow()` entry point for app-driven cadence.
+* Verifies every SET: JWS signature against the transmitter's JWKS plus
+  `iss` / `iat` / `jti` / `aud` checks per RFC 8417. RS256-only + 2048-bit
+  minimum RSA key by default (CAEP Interop §3.1) — both knobs are
+  config-tunable.
+* Manages stream lifecycle in two modes:
+** `RECEIVER` (default) — extension calls the transmitter's
+   `configuration_endpoint` on startup to discover an existing stream or
+   create a new one.
+** `TRANSMITTER` — operator pre-creates the stream and provides a `stream-id`.
+* Exposes `SsfStreamClient` for the full §8.1.x management surface
+  (read / create / patch / replace / delete config, status read+update,
+  add/remove subjects, request verification, POLL).
+* Optional Micrometer metrics + per-event-type counters.
+* Outbound auth: static bearer token, self-contained OAuth2
+  `client_credentials` (no extra dep), `quarkus-oidc-client`, or no-op.
+
+=== Installation
+
+Add the extension to your Quarkus application:
+
+[source,xml,subs=attributes+]
+----
+<dependency>
+    <groupId>io.quarkiverse.openid-ssf</groupId>
+    <artifactId>quarkus-openid-ssf-receiver</artifactId>
+    <version>{project-version}</version>
+</dependency>
+----
+
+=== Quick start
+
+The fastest end-to-end smoke test is against the public
+https://ssf.caep.dev[caep.dev] transmitter — no Keycloak setup, no
+public tunnel, and no admin server of your own.
+
+. Sign in at https://ssf.caep.dev and copy the access token.
+. Open https://caep.dev/transmitter/events, set the **audience** and
+  start the transmitter session.
+. Run the receiver-managed example in POLL mode:
++
+[source,shell,subs=attributes+]
+----
+export SSF_RECEIVER_TRANSMITTER_ACCESS_TOKEN=<your-caep-dev-token>
+export SSF_RECEIVER_EXPECTED_AUDIENCE=https://my-receiver.example/ssf
+
+mvn -pl receiver/examples/example-receiver-managed-stream quarkus:dev \
+    -Dquarkus.profile=caepdev \
+    -Dquarkus.openid-ssf.receiver.delivery-method=POLL \
+    -Dquarkus.openid-ssf.receiver.poll.interval=5s
+----
++
+. Fire an event from the caep.dev transmitter tab.
+. Inspect `curl -s localhost:28080/events/recent-events | jq`.
+
+See the
+https://github.com/quarkiverse/quarkus-openid-ssf#readme[repository README]
+for the full walkthrough, including Keycloak setup, the consumer SPI
+(`SsfEventHandler`), the usage-pattern catalogue, and operations notes.
+
+=== Consumer SPI
+
+Provide a CDI bean implementing `SsfEventHandler`:
+
+[source,java]
+----
+@ApplicationScoped
+public class MyHandler implements SsfEventHandler {
+    @Override
+    public void handle(SsfEventContext eventContext) {
+        if (eventContext.hasEvent("CaepSessionRevoked")) {
+            // … invalidate sessions for eventContext.eventToken().subjectId() …
+        }
+    }
+}
+----
+
+Without an explicit handler, the default `LoggingSsfEventHandler` logs
+`jti` / `iss` / event-type aliases at INFO.
+
+=== Architecture
+
+For the "why is the code shaped this way" view — module layout, startup
+observer priorities, hot-path flow, build-time decisions — see
+https://github.com/quarkiverse/quarkus-openid-ssf/blob/main/design/receiver.md[`design/receiver.md`].
+
+[[extension-configuration-reference]]
+=== Configuration Reference
+
+include::includes/quarkus-openid-ssf-receiver.adoc[leveloffset=+2, opts=optional]

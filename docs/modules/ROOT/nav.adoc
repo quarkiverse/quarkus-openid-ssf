@@ -1,0 +1,2 @@
+* xref:index.adoc[Quarkus OpenID SSF]
+** xref:index.adoc#receiver[Receiver]

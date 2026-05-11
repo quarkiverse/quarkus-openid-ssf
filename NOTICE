@@ -1,8 +1,8 @@
-Quarkus SSF Receiver Extension
-Copyright 2026 Thomas Darimont and the easyssf.com contributors.
+Quarkus OpenID SSF Extension
+Copyright 2026 Thomas Darimont and the Quarkiverse contributors.
 
 This product includes software developed by Thomas Darimont
-(https://easyssf.com).
+and the Quarkiverse community (https://github.com/quarkiverse).
 
 This product is licensed under the Apache License, Version 2.0
 (see the LICENSE file in the root of this repository).

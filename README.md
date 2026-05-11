@@ -1,7 +1,7 @@
-# quarkus-ssf-receiver
+# quarkus-openid-ssf
 
-[![Build (JVM)](https://github.com/easyssf/quarkus-ssf-receiver/actions/workflows/build.yml/badge.svg)](.github/workflows/build.yml)
-[![Native build](https://github.com/easyssf/quarkus-ssf-receiver/actions/workflows/native.yml/badge.svg)](.github/workflows/native.yml)
+[![Build (JVM)](https://github.com/quarkiverse/quarkus-openid-ssf/actions/workflows/build.yml/badge.svg)](.github/workflows/build.yml)
+[![Native build](https://github.com/quarkiverse/quarkus-openid-ssf/actions/workflows/native.yml/badge.svg)](.github/workflows/native.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 A Quarkus extension that lets a Quarkus app act as a [Shared Signals Framework
@@ -18,7 +18,8 @@ OAuth2 access tokens fits.
 | **License** | [Apache-2.0](LICENSE) |
 | **Java** | 21+ (extension and examples both compile under `--release 21`) |
 | **Quarkus** | 3.35.x (floor — see [Compatibility](#compatibility)) |
-| **Group ID** | `com.easyssf` |
+| **Group ID** | `io.quarkiverse.openid-ssf` |
+| **Receiver artifact** | `quarkus-openid-ssf-receiver` |
 
 ## What it does
 
@@ -42,10 +43,10 @@ OAuth2 access tokens fits.
 
 | Module | Role |
 |---|---|
-| [`runtime/`](runtime/) | Extension runtime: config mapping, `SsfEventHandler` SPI, JWKS resolver, SET verifier, push route, POLL scheduler, stream client, alias resolver, metrics SPI. |
-| [`deployment/`](deployment/) | Build-time processor — registers beans + REST clients, picks the right `TransmitterTokenProvider` at build time, wires Micrometer when present. Also contains the smoke test (signed SET round-trip with a stub JWKS). |
-| [`examples/example-transmitter-managed-stream/`](examples/example-transmitter-managed-stream/) | Runnable Quarkus app — TRANSMITTER mode + PUSH delivery, env-var-driven, OIDC `client_credentials` for outbound auth. |
-| [`examples/example-receiver-managed-stream/`](examples/example-receiver-managed-stream/) | Runnable Quarkus app — RECEIVER mode. Default config is neutral; the `caepdev` profile overlays caep.dev (PUSH + static token), the `keycloak` profile overlays an OIDC + POLL setup. |
+| [`receiver/runtime/`](receiver/runtime/) | Extension runtime: config mapping, `SsfEventHandler` SPI, JWKS resolver, SET verifier, push route, POLL scheduler, stream client, alias resolver, metrics SPI. |
+| [`receiver/deployment/`](receiver/deployment/) | Build-time processor — registers beans + REST clients, picks the right `TransmitterTokenProvider` at build time, wires Micrometer when present. Also contains the smoke test (signed SET round-trip with a stub JWKS). |
+| [`receiver/examples/example-transmitter-managed-stream/`](receiver/examples/example-transmitter-managed-stream/) | Runnable Quarkus app — TRANSMITTER mode + PUSH delivery, env-var-driven, OIDC `client_credentials` for outbound auth. |
+| [`receiver/examples/example-receiver-managed-stream/`](receiver/examples/example-receiver-managed-stream/) | Runnable Quarkus app — RECEIVER mode. Default config is neutral; the `caepdev` profile overlays caep.dev (PUSH + static token), the `keycloak` profile overlays an OIDC + POLL setup. |
 
 ## Consumer SPI
 
@@ -106,10 +107,10 @@ transmitter. Leave the tab open — you'll fire events from here in step 5.
 export SSF_RECEIVER_TRANSMITTER_ACCESS_TOKEN=<your-caep-dev-token>
 export SSF_RECEIVER_EXPECTED_AUDIENCE=https://my-receiver.example/ssf
 
-mvn -pl examples/example-receiver-managed-stream quarkus:dev \
+mvn -pl receiver/examples/example-receiver-managed-stream quarkus:dev \
     -Dquarkus.profile=caepdev \
-    -Dssf.receiver.delivery-method=POLL \
-    -Dssf.receiver.poll.interval=5s
+    -Dquarkus.openid-ssf.receiver.delivery-method=POLL \
+    -Dquarkus.openid-ssf.receiver.poll.interval=5s
 ```
 
 The `caepdev` profile points the receiver at `https://ssf.caep.dev` and
@@ -117,7 +118,7 @@ selects the static-token outbound auth provider. The two `-D` overrides
 flip the example from PUSH (its profile default) to POLL — no inbound
 endpoint to expose. By default the receiver subscribes to
 `session-revoked` and `credential-change`; edit
-`ssf.receiver.events-requested` in `application.properties` to widen.
+`quarkus.openid-ssf.receiver.events-requested` in `application.properties` to widen.
 
 ### 4. Confirm the receiver registered with caep.dev
 
@@ -149,25 +150,25 @@ either of these snippets is enough:
 
 ```properties
 # Transmitter-managed (operator owns the stream)
-ssf.receiver.transmitter-issuer=https://transmitter.example
-ssf.receiver.stream-management=TRANSMITTER
-ssf.receiver.stream-id=<from the transmitter's admin / onboarding flow>
-ssf.receiver.delivery-method=PUSH
-ssf.receiver.push.expected-auth-header=Bearer <shared-secret>   # optional
+quarkus.openid-ssf.receiver.transmitter-issuer=https://transmitter.example
+quarkus.openid-ssf.receiver.stream-management=TRANSMITTER
+quarkus.openid-ssf.receiver.stream-id=<from the transmitter's admin / onboarding flow>
+quarkus.openid-ssf.receiver.delivery-method=PUSH
+quarkus.openid-ssf.receiver.push.expected-auth-header=Bearer <shared-secret>   # optional
 ```
 
 ```properties
 # Receiver-managed (extension creates / rediscovers the stream)
-ssf.receiver.transmitter-issuer=https://transmitter.example
-ssf.receiver.stream-management=RECEIVER
-ssf.receiver.delivery-method=PUSH                               # or POLL
-ssf.receiver.push.delivery-endpoint-url=https://my-app.example/ssf/push
-ssf.receiver.expected-audience=https://my-app.example
+quarkus.openid-ssf.receiver.transmitter-issuer=https://transmitter.example
+quarkus.openid-ssf.receiver.stream-management=RECEIVER
+quarkus.openid-ssf.receiver.delivery-method=PUSH                               # or POLL
+quarkus.openid-ssf.receiver.push.delivery-endpoint-url=https://my-app.example/ssf/push
+quarkus.openid-ssf.receiver.expected-audience=https://my-app.example
 # Built-in CAEP / RISC aliases work directly; full URIs are also accepted.
-ssf.receiver.events-requested=CaepSessionRevoked,CaepCredentialChange
+quarkus.openid-ssf.receiver.events-requested=CaepSessionRevoked,CaepCredentialChange
 # Optional — defaults shown.
-ssf.receiver.receiver-managed.register-stream=true
-ssf.receiver.receiver-managed.delete-on-shutdown=false
+quarkus.openid-ssf.receiver.receiver-managed.register-stream=true
+quarkus.openid-ssf.receiver.receiver-managed.delete-on-shutdown=false
 ```
 
 In RECEIVER mode the registrar lists this receiver's existing streams on the
@@ -210,12 +211,12 @@ public class SessionRevocationHandler implements SsfEventHandler {
 ```
 
 ```properties
-ssf.receiver.transmitter-issuer=https://transmitter.example
-ssf.receiver.stream-management=TRANSMITTER
-ssf.receiver.stream-id=<from the transmitter's admin / onboarding flow>
-ssf.receiver.delivery-method=PUSH
-ssf.receiver.expected-audience=https://my-app.example
-ssf.receiver.push.expected-auth-header=Bearer ${PUSH_SHARED_SECRET}
+quarkus.openid-ssf.receiver.transmitter-issuer=https://transmitter.example
+quarkus.openid-ssf.receiver.stream-management=TRANSMITTER
+quarkus.openid-ssf.receiver.stream-id=<from the transmitter's admin / onboarding flow>
+quarkus.openid-ssf.receiver.delivery-method=PUSH
+quarkus.openid-ssf.receiver.expected-audience=https://my-app.example
+quarkus.openid-ssf.receiver.push.expected-auth-header=Bearer ${PUSH_SHARED_SECRET}
 ```
 
 **Key points:**
@@ -260,13 +261,13 @@ public class KafkaForwarder implements SsfEventHandler {
 ```
 
 ```properties
-ssf.receiver.transmitter-issuer=https://transmitter.example
-ssf.receiver.stream-management=RECEIVER
-ssf.receiver.delivery-method=POLL
-ssf.receiver.alias=audit-hub-prod-eu
-ssf.receiver.poll.interval=5s
-ssf.receiver.poll.return-immediately=false   # long-poll for low latency
-ssf.receiver.events-requested=\
+quarkus.openid-ssf.receiver.transmitter-issuer=https://transmitter.example
+quarkus.openid-ssf.receiver.stream-management=RECEIVER
+quarkus.openid-ssf.receiver.delivery-method=POLL
+quarkus.openid-ssf.receiver.alias=audit-hub-prod-eu
+quarkus.openid-ssf.receiver.poll.interval=5s
+quarkus.openid-ssf.receiver.poll.return-immediately=false   # long-poll for low latency
+quarkus.openid-ssf.receiver.events-requested=\
     https://schemas.openid.net/secevent/caep/event-type/session-revoked,\
     https://schemas.openid.net/secevent/caep/event-type/credential-change,\
     https://schemas.openid.net/secevent/caep/event-type/assurance-level-change
@@ -288,7 +289,7 @@ public class JdbcSsfPollAckStore implements SsfPollAckStore {
 **Key points:**
 - RECEIVER-managed: forwarder creates its own subscription on each transmitter.
 - POLL delivery: forwarder can sit anywhere reachable to the transmitter (no inbound HTTP needed).
-- `ssf.receiver.alias` distinguishes multiple forwarder instances scraped into the same monitoring store (`receiver` tag on `ssf.receiver.events.processed`).
+- `quarkus.openid-ssf.receiver.alias` distinguishes multiple forwarder instances scraped into the same monitoring store (`receiver` tag on `ssf.receiver.events.processed`).
 - Custom `SsfPollAckStore` (`@ApplicationScoped`, no `@DefaultBean`) replaces the in-memory deque; the extension picks it up automatically.
 - Forwarder MUST be idempotent on the Kafka / SIEM side — the receiver's at-least-once semantics propagate through.
 
@@ -319,12 +320,12 @@ public class StepUpTrigger implements SsfEventHandler {
 
 ```properties
 # Same minimum config as pattern 1, plus:
-ssf.receiver.alias=auth-edge
+quarkus.openid-ssf.receiver.alias=auth-edge
 
 # Tighter poll cadence if PUSH isn't an option:
-ssf.receiver.delivery-method=POLL
-ssf.receiver.poll.interval=2s
-ssf.receiver.poll.return-immediately=false
+quarkus.openid-ssf.receiver.delivery-method=POLL
+quarkus.openid-ssf.receiver.poll.interval=2s
+quarkus.openid-ssf.receiver.poll.return-immediately=false
 ```
 
 **Key points:**
@@ -354,8 +355,8 @@ INFO  Receiver-managed mode: created stream stream_id=… (status=enabled, deliv
 
 Disable per mode if outbound credentials aren't available:
 ```properties
-ssf.receiver.transmitter-managed.probe-on-startup=false
-ssf.receiver.receiver-managed.register-stream=false
+quarkus.openid-ssf.receiver.transmitter-managed.probe-on-startup=false
+quarkus.openid-ssf.receiver.receiver-managed.register-stream=false
 ```
 
 ### Startup resilience (RECEIVER mode)
@@ -386,8 +387,8 @@ don't redeliver to the handler).
 ```properties
 # Enabled by default. Disable if your handler is naturally idempotent and
 # the extra lookup is wasted work.
-ssf.receiver.dedup.enabled=true
-ssf.receiver.dedup.capacity=10000
+quarkus.openid-ssf.receiver.dedup.enabled=true
+quarkus.openid-ssf.receiver.dedup.capacity=10000
 ```
 
 The default `InMemorySsfJtiDedupStore` is a bounded `LinkedHashMap` with
@@ -407,7 +408,7 @@ Metrics:
 ## Delivery: PUSH
 
 Push endpoint defaults to `POST /ssf/push` (relative to `quarkus.http.root-path`);
-override via `ssf.receiver.push.endpoint-path`.
+override via `quarkus.openid-ssf.receiver.push.endpoint-path`.
 
 | Condition | Response |
 |---|---|
@@ -421,18 +422,18 @@ on `kid` miss before failing.
 ## Delivery: POLL (RFC 8936)
 
 ```properties
-ssf.receiver.delivery-method=POLL
+quarkus.openid-ssf.receiver.delivery-method=POLL
 
 # Optional — defaults shown.
-ssf.receiver.poll.interval=30s
-ssf.receiver.poll.start-delay=0s             # delay before the first poll
-ssf.receiver.poll.auto-start=true            # false → drive polling manually
-ssf.receiver.poll.max-events=100
-ssf.receiver.poll.return-immediately=true    # false → long-poll
-ssf.receiver.poll.drain-on-poll=true         # if moreAvailable=true, keep polling
-ssf.receiver.poll.timeout=30s
+quarkus.openid-ssf.receiver.poll.interval=30s
+quarkus.openid-ssf.receiver.poll.start-delay=0s             # delay before the first poll
+quarkus.openid-ssf.receiver.poll.auto-start=true            # false → drive polling manually
+quarkus.openid-ssf.receiver.poll.max-events=100
+quarkus.openid-ssf.receiver.poll.return-immediately=true    # false → long-poll
+quarkus.openid-ssf.receiver.poll.drain-on-poll=true         # if moreAvailable=true, keep polling
+quarkus.openid-ssf.receiver.poll.timeout=30s
 # Override only if the stream's delivery.endpoint_url isn't queryable:
-#ssf.receiver.poll.endpoint-url=https://transmitter.example/ssf/poll/<stream>
+#quarkus.openid-ssf.receiver.poll.endpoint-url=https://transmitter.example/ssf/poll/<stream>
 ```
 
 The poll endpoint URL is normally **discovered** from the stream's
@@ -453,7 +454,7 @@ extension swaps it in automatically.
 
 ### Manual polling
 
-`ssf.receiver.poll.auto-start=false` keeps the poller idle. Inject `SsfPoller`
+`quarkus.openid-ssf.receiver.poll.auto-start=false` keeps the poller idle. Inject `SsfPoller`
 and drive it from app code:
 
 ```java
@@ -468,8 +469,8 @@ Four-way selection, made at **build time**. The first match wins:
 
 | Configured | Provider | Notes |
 |---|---|---|
-| `ssf.receiver.transmitter-access-token` set | `StaticTransmitterTokenProvider` | Sends the literal value as `Authorization: Bearer …`. For transmitters like caep.dev that issue long-lived tokens out-of-band. |
-| `ssf.receiver.oauth2.token-endpoint` set | `Oauth2TransmitterTokenProvider` | Self-contained `client_credentials` grant — no `quarkus-oidc-client` dependency. Caches the token in-process with expiry-safety-window-aware refresh and concurrent-refresh coalescing. Supports `client_secret_basic` (default, RFC 6749 §2.3.1) and `client_secret_post` via `ssf.receiver.oauth2.client-auth-method`. |
+| `quarkus.openid-ssf.receiver.transmitter-access-token` set | `StaticTransmitterTokenProvider` | Sends the literal value as `Authorization: Bearer …`. For transmitters like caep.dev that issue long-lived tokens out-of-band. |
+| `quarkus.openid-ssf.receiver.oauth2.token-endpoint` set | `Oauth2TransmitterTokenProvider` | Self-contained `client_credentials` grant — no `quarkus-oidc-client` dependency. Caches the token in-process with expiry-safety-window-aware refresh and concurrent-refresh coalescing. Supports `client_secret_basic` (default, RFC 6749 §2.3.1) and `client_secret_post` via `quarkus.openid-ssf.receiver.oauth2.client-auth-method`. |
 | `quarkus-oidc-client` on the classpath | `OidcTransmitterTokenProvider` | Fetches a token via `quarkus.oidc-client.*` (typically `client_credentials`). Useful when the consumer already wires OIDC for inbound auth and wants to share the client config. |
 | Neither | `NoopTransmitterTokenProvider` | No `Authorization` header. Fine for purely local stubs / public metadata. |
 
@@ -480,15 +481,15 @@ profile.
 
 ```properties
 # Self-contained OAuth2 example — no quarkus-oidc-client needed.
-ssf.receiver.oauth2.token-endpoint=https://auth.example/oauth/token
-ssf.receiver.oauth2.client-id=my-client
-ssf.receiver.oauth2.client-secret=${OAUTH2_CLIENT_SECRET}
+quarkus.openid-ssf.receiver.oauth2.token-endpoint=https://auth.example/oauth/token
+quarkus.openid-ssf.receiver.oauth2.client-id=my-client
+quarkus.openid-ssf.receiver.oauth2.client-secret=${OAUTH2_CLIENT_SECRET}
 # Optional defaults shown:
-#ssf.receiver.oauth2.grant-type=client_credentials
-#ssf.receiver.oauth2.client-auth-method=basic       # or 'post'
-#ssf.receiver.oauth2.scopes=ssf.read,ssf.manage
-#ssf.receiver.oauth2.expiry-safety-window=30s
-#ssf.receiver.oauth2.timeout=5s
+#quarkus.openid-ssf.receiver.oauth2.grant-type=client_credentials
+#quarkus.openid-ssf.receiver.oauth2.client-auth-method=basic       # or 'post'
+#quarkus.openid-ssf.receiver.oauth2.scopes=ssf.read,ssf.manage
+#quarkus.openid-ssf.receiver.oauth2.expiry-safety-window=30s
+#quarkus.openid-ssf.receiver.oauth2.timeout=5s
 ```
 
 JWKS, metadata, and the configuration endpoint (when called for stream
@@ -498,7 +499,7 @@ discovery) are unauthenticated by SSF/OIDC convention — the extension does
 ## Metrics (optional)
 
 Add `quarkus-micrometer-registry-prometheus` (or another registry extension)
-and the extension publishes the following meters under `ssf.receiver.*`. Without
+and the extension publishes the following meters under `quarkus.openid-ssf.receiver.*`. Without
 it, a no-op SPI is in effect — zero behavior change.
 
 | Meter | Type | Tags |
@@ -535,15 +536,15 @@ Three independent alias domains:
 # 1. Event-type URI → short alias. Built-ins cover SSF + CAEP + RISC out of
 #    the box (see table below); the lines here are only for vendor-specific
 #    URIs the spec doesn't cover.
-ssf.receiver.event-aliases.VendorWidgetReplaced=https://schemas.example.org/vendor/event-type/widget-replaced
+quarkus.openid-ssf.receiver.event-aliases.VendorWidgetReplaced=https://schemas.example.org/vendor/event-type/widget-replaced
 
 # 2. Transmitter issuer URL → short alias. No built-ins.
-ssf.receiver.issuer-aliases.CaepDev=https://ssf.caep.dev
-ssf.receiver.issuer-aliases.MyTransmitter=https://transmitter.example
+quarkus.openid-ssf.receiver.issuer-aliases.CaepDev=https://ssf.caep.dev
+quarkus.openid-ssf.receiver.issuer-aliases.MyTransmitter=https://transmitter.example
 
 # 3. This receiver's own short name — surfaces as the `receiver` tag on
 #    Micrometer meters. Falls back to expected-audience, then "unknown".
-ssf.receiver.alias=my-receiver
+quarkus.openid-ssf.receiver.alias=my-receiver
 ```
 
 ### Where aliases show up
@@ -551,7 +552,7 @@ ssf.receiver.alias=my-receiver
 | Surface | Behavior |
 |---|---|
 | **Handler code** (`SsfEventContext`) | `eventContext.hasEvent("CaepSessionRevoked")` and `eventContext.eventFor(...)` accept either an alias or a full URI. `eventContext.issAlias()` and `eventContext.eventsByAlias()` expose the resolved view directly. |
-| **Config** (`ssf.receiver.events-requested`) | Each entry can be a URI or an alias. Unknown aliases fail fast at startup with a list of registered names. |
+| **Config** (`quarkus.openid-ssf.receiver.events-requested`) | Each entry can be a URI or an alias. Unknown aliases fail fast at startup with a list of registered names. |
 | **Metrics** (`ssf.receiver.events.processed`) | The `event`, `iss`, and `receiver` tags are alias values, so Prometheus / Grafana don't show URIs. |
 | **Logs** | `LoggingSsfEventHandler` and the registrar / probe startup lines emit alias-resolved values. |
 
@@ -565,7 +566,7 @@ Covered out of the box — no config needed.
 | [**OpenID CAEP 1.0**](https://openid.net/specs/openid-caep-1_0-final.html) | `session-revoked`, `token-claims-change`, `credential-change`, `assurance-level-change`, `device-compliance-change`, `session-established`, `session-presented`, `risk-level-change` | `CaepSessionRevoked`, `CaepTokenClaimsChange`, `CaepCredentialChange`, `CaepAssuranceLevelChange`, `CaepDeviceComplianceChange`, `CaepSessionEstablished`, `CaepSessionPresented`, `CaepRiskLevelChange` |
 | [**OpenID RISC 1.0**](https://openid.net/specs/openid-risc-1_0-final.html) | `account-credential-change-required`, `account-purged`, `account-disabled`, `account-enabled`, `identifier-changed`, `identifier-recycled`, `credential-compromise`, `opt-in`, `opt-out-initiated`, `opt-out-cancelled`, `opt-out-effective`, `recovery-activated`, `recovery-information-changed` | `RiscAccountCredentialChangeRequired`, `RiscAccountPurged`, `RiscAccountDisabled`, `RiscAccountEnabled`, `RiscIdentifierChanged`, `RiscIdentifierRecycled`, `RiscCredentialCompromise`, `RiscOptIn`, `RiscOptOutInitiated`, `RiscOptOutCancelled`, `RiscOptOutEffective`, `RiscRecoveryActivated`, `RiscRecoveryInformationChanged` |
 
-Consumer entries in `ssf.receiver.event-aliases.*` **overlay** the built-ins —
+Consumer entries in `quarkus.openid-ssf.receiver.event-aliases.*` **overlay** the built-ins —
 a user mapping for a built-in URI replaces the alias name (the URI itself
 stays the same).
 
@@ -593,7 +594,7 @@ validator) needs to surface typos eagerly.
 ## Disable switch
 
 ```properties
-ssf.receiver.enabled=false
+quarkus.openid-ssf.receiver.enabled=false
 ```
 
 When `false`, every startup observer (validator, push route, probe, registrar,
@@ -605,14 +606,14 @@ or runtime kill-switching via env var.
 ## Build
 
 ```sh
-mvn -DskipTests install                  # build + install all artifacts
-mvn -pl runtime,deployment test          # full layer-1 + layer-2 test suite
+mvn -DskipTests install                                                # build + install all artifacts
+mvn -pl receiver/runtime,receiver/deployment test                      # full layer-1 + layer-2 test suite
 
 # Run the examples — see each example's README for the env vars they need.
-mvn -pl examples/example-transmitter-managed-stream quarkus:dev
-mvn -pl examples/example-receiver-managed-stream    quarkus:dev
-mvn -pl examples/example-receiver-managed-stream    quarkus:dev -Dquarkus.profile=caepdev
-mvn -pl examples/example-receiver-managed-stream    quarkus:dev -Dquarkus.profile=keycloak
+mvn -pl receiver/examples/example-transmitter-managed-stream quarkus:dev
+mvn -pl receiver/examples/example-receiver-managed-stream    quarkus:dev
+mvn -pl receiver/examples/example-receiver-managed-stream    quarkus:dev -Dquarkus.profile=caepdev
+mvn -pl receiver/examples/example-receiver-managed-stream    quarkus:dev -Dquarkus.profile=keycloak
 ```
 
 ## Out of scope (today)
@@ -626,4 +627,4 @@ mvn -pl examples/example-receiver-managed-stream    quarkus:dev -Dquarkus.profil
   consumers parse what they care about.
 - Multi-transmitter receivers — the extension currently subscribes to a
   single transmitter per app. Multi-transmitter consumers run multiple
-  receiver instances with distinct `ssf.receiver.alias` values.
+  receiver instances with distinct `quarkus.openid-ssf.receiver.alias` values.

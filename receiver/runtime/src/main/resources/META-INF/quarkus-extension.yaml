@@ -1,0 +1,23 @@
+---
+name: "OpenID SSF Receiver"
+artifact: ${project.groupId}:${project.artifactId}:${project.version}
+description: "Shared Signals Framework (SSF) receiver that accepts SET pushes (RFC 8935) and pulls SETs via poll (RFC 8936) from a SSF transmitter. Supports both transmitter-managed and receiver-managed stream lifecycles."
+metadata:
+  keywords:
+    - "ssf"
+    - "shared-signals"
+    - "set"
+    - "secevent"
+    - "caep"
+    - "risc"
+    - "rfc8417"
+    - "rfc8935"
+    - "rfc8936"
+    - "keycloak"
+    - "oidc"
+    - "security"
+  categories:
+    - "security"
+  status: "experimental"
+  config:
+    - "quarkus.openid-ssf.receiver."
