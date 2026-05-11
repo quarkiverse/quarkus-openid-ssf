@@ -559,11 +559,11 @@ ssf.receiver.alias=my-receiver
 
 Covered out of the box — no config needed.
 
-| Spec | URI suffix (under `…/secevent/<spec>/event-type/`) | Aliases |
-|---|---|---|
-| **OpenID SSF** | `verification`, `stream-updated` | `SsfStreamVerification`, `SsfStreamUpdated` |
-| **OpenID CAEP 1.0** | `session-revoked`, `token-claims-change`, `credential-change`, `assurance-level-change`, `device-compliance-change`, `session-established`, `session-presented`, `risk-level-change` | `CaepSessionRevoked`, `CaepTokenClaimsChange`, `CaepCredentialChange`, `CaepAssuranceLevelChange`, `CaepDeviceComplianceChange`, `CaepSessionEstablished`, `CaepSessionPresented`, `CaepRiskLevelChange` |
-| **OpenID RISC 1.0** | `account-credential-change-required`, `account-purged`, `account-disabled`, `account-enabled`, `identifier-changed`, `identifier-recycled`, `credential-compromise`, `opt-in`, `opt-out-initiated`, `opt-out-cancelled`, `opt-out-effective`, `recovery-activated`, `recovery-information-changed` | `RiscAccountCredentialChangeRequired`, `RiscAccountPurged`, `RiscAccountDisabled`, `RiscAccountEnabled`, `RiscIdentifierChanged`, `RiscIdentifierRecycled`, `RiscCredentialCompromise`, `RiscOptIn`, `RiscOptOutInitiated`, `RiscOptOutCancelled`, `RiscOptOutEffective`, `RiscRecoveryActivated`, `RiscRecoveryInformationChanged` |
+| Spec                                                                       | URI suffix (under `…/secevent/<spec>/event-type/`) | Aliases |
+|----------------------------------------------------------------------------|---|---|
+| **OpenID SSF 1.0 (Stream Events)**                                         | `verification`, `stream-updated` | `SsfStreamVerification`, `SsfStreamUpdated` |
+| [**OpenID CAEP 1.0**](https://openid.net/specs/openid-caep-1_0-final.html) | `session-revoked`, `token-claims-change`, `credential-change`, `assurance-level-change`, `device-compliance-change`, `session-established`, `session-presented`, `risk-level-change` | `CaepSessionRevoked`, `CaepTokenClaimsChange`, `CaepCredentialChange`, `CaepAssuranceLevelChange`, `CaepDeviceComplianceChange`, `CaepSessionEstablished`, `CaepSessionPresented`, `CaepRiskLevelChange` |
+| [**OpenID RISC 1.0**](https://openid.net/specs/openid-risc-1_0-final.html) | `account-credential-change-required`, `account-purged`, `account-disabled`, `account-enabled`, `identifier-changed`, `identifier-recycled`, `credential-compromise`, `opt-in`, `opt-out-initiated`, `opt-out-cancelled`, `opt-out-effective`, `recovery-activated`, `recovery-information-changed` | `RiscAccountCredentialChangeRequired`, `RiscAccountPurged`, `RiscAccountDisabled`, `RiscAccountEnabled`, `RiscIdentifierChanged`, `RiscIdentifierRecycled`, `RiscCredentialCompromise`, `RiscOptIn`, `RiscOptOutInitiated`, `RiscOptOutCancelled`, `RiscOptOutEffective`, `RiscRecoveryActivated`, `RiscRecoveryInformationChanged` |
 
 Consumer entries in `ssf.receiver.event-aliases.*` **overlay** the built-ins —
 a user mapping for a built-in URI replaces the alias name (the URI itself
