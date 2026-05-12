@@ -1,4 +1,4 @@
 name: Quarkus OpenID SSF
 release:
-  current-version: "0.0.1"
+  current-version: "0.0.2"
   next-version: "999-SNAPSHOT"
