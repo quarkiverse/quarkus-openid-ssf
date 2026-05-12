@@ -5,7 +5,7 @@
     <parent>
         <groupId>io.quarkiverse.openid-ssf</groupId>
         <artifactId>quarkus-openid-ssf-receiver-parent</artifactId>
-        <version>0.0.3</version>
+        <version>999-SNAPSHOT</version>
     </parent>
 
     <artifactId>quarkus-openid-ssf-receiver-deployment</artifactId>

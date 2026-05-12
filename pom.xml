@@ -10,7 +10,7 @@
 
     <groupId>io.quarkiverse.openid-ssf</groupId>
     <artifactId>quarkus-openid-ssf-parent</artifactId>
-    <version>0.0.3</version>
+    <version>999-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>Quarkus OpenID SSF - Parent</name>
@@ -20,7 +20,7 @@
         <connection>scm:git:git@github.com:quarkiverse/quarkus-openid-ssf.git</connection>
         <developerConnection>scm:git:git@github.com:quarkiverse/quarkus-openid-ssf.git</developerConnection>
         <url>https://github.com/quarkiverse/quarkus-openid-ssf</url>
-        <tag>0.0.3</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <modules>
