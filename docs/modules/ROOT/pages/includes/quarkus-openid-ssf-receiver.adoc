@@ -15,7 +15,7 @@ endif::add-copy-button-to-config-props[]
 
 [.description]
 --
-Master kill switch for the SSF receiver. When `false`, all startup observers (validator, push route registration, transmitter probe, receiver-managed registrar, POLL scheduler) become no-ops and no inbound SETs are accepted or pulled. Other beans (`SsfStreamClient`, metrics, alias resolver) stay wired in CDI so application code that touches them directly still works — but nothing happens automatically.
+Kill switch for the SSF receiver. When `false`, all startup observers (validator, push route registration, transmitter probe, receiver-managed registrar, POLL scheduler) become no-ops and no inbound SETs are accepted or pulled. Other beans (`SsfStreamClient`, metrics, alias resolver) stay wired in CDI so application code that touches them directly still works — but nothing happens automatically.
 
 Useful for `%test.quarkus.openid-ssf.receiver.enabled=false` or runtime kill-switch via env var. Defaults to `true` so existing apps upgrade without behavior change.
 
