@@ -10,7 +10,7 @@
 
     <groupId>io.quarkiverse.openid-ssf</groupId>
     <artifactId>quarkus-openid-ssf-parent</artifactId>
-    <version>999-SNAPSHOT</version>
+    <version>0.0.3</version>
     <packaging>pom</packaging>
 
     <name>Quarkus OpenID SSF - Parent</name>
@@ -20,7 +20,7 @@
         <connection>scm:git:git@github.com:quarkiverse/quarkus-openid-ssf.git</connection>
         <developerConnection>scm:git:git@github.com:quarkiverse/quarkus-openid-ssf.git</developerConnection>
         <url>https://github.com/quarkiverse/quarkus-openid-ssf</url>
-        <tag>HEAD</tag>
+        <tag>0.0.3</tag>
     </scm>
 
     <modules>
@@ -44,7 +44,7 @@
             Default to empty so receiver/runtime/pom.xml's javaagent argLine
             substitution resolves cleanly when no other plugin sets it.
         -->
-        <argLine/>
+        <argLine />
     </properties>
 
     <dependencyManagement>
