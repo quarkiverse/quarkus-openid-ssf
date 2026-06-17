@@ -333,6 +333,47 @@ quarkus.openid-ssf.receiver.poll.return-immediately=false
 - `SubjectFlags` is the application's own state store (Redis / Caffeine); the SSF extension stays out of authorization logic.
 - The `quarkus-oidc` resource-server filter then checks `flags.requiresStepUp(sub)` on each request and 401s if true. SSF and OIDC compose cleanly — neither knows about the other.
 
+## Standalone example app
+
+[`quarkus-openid-ssf-test`](https://github.com/thomasdarimont/quarkus-openid-ssf-test)
+is a separate, copy-pasteable consumer app that depends on the **released**
+`quarkus-openid-ssf-receiver` artifact (rather than building from source). It
+wires the receiver against a transmitter (Keycloak or caep.dev), captures
+incoming SETs into an in-memory ring buffer via a custom `SsfEventHandler`, and
+exposes them over a small REST API — a good starting point for your own receiver.
+
+It demonstrates:
+
+- Receiver registration against an SSF transmitter.
+- Both `POLL` (active default, `10s` interval) and `PUSH` delivery — switch by
+  toggling the commented blocks in `application.properties`.
+- OAuth2 `client_credentials` outbound auth via `quarkus-oidc-client`.
+- A custom `CapturingSsfEventHandler` subscribed to `CaepSessionRevoked` and
+  `CaepCredentialChange`.
+- Prometheus metrics at `/q/metrics`.
+
+```sh
+git clone https://github.com/thomasdarimont/quarkus-openid-ssf-test
+cd quarkus-openid-ssf-test
+
+# Transmitter + OIDC client coordinates (client needs ssf.read + ssf.manage scopes)
+export SSF_RECEIVER_TRANSMITTER_ISSUER=https://transmitter.example
+export OIDC_ISSUER_URL=https://auth.example/realms/ssf
+export SSF_RECEIVER_CLIENT_ID=ssf-receiver
+export SSF_RECEIVER_CLIENT_SECRET=<secret>
+
+./mvnw quarkus:dev
+```
+
+Then inspect the captured events:
+
+```sh
+curl -s localhost:8080/events/recent-events | jq   # up to 50 most recent SETs
+curl -s localhost:8080/events/latest        | jq   # the single most recent SET
+```
+
+Currently pinned to `quarkus-openid-ssf-receiver` 0.0.3 / Quarkus 3.35.2 / Java 21.
+
 ## Compatibility
 
 | | Tested | Floor | Notes |
