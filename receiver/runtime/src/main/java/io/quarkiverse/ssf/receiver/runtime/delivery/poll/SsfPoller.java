@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -70,6 +71,9 @@ import io.vertx.core.http.HttpHeaders;
 public class SsfPoller {
 
     private static final Logger LOG = Logger.getLogger(SsfPoller.class);
+
+    /** RFC 6585 §4 — not in {@link Response.Status}. */
+    private static final int TOO_MANY_REQUESTS = 429;
 
     @Inject
     SsfReceiverConfig config;
@@ -265,18 +269,17 @@ public class SsfPoller {
     }
 
     /**
-     * Turns a failed poll request into a backoff duration when the transmitter
-     * rate-limited us: {@code 429} always (with {@code Retry-After} if sent,
-     * otherwise the configured fallback), {@code 503} only when it carries
+     * Turns a failed poll response into a backoff duration when the transmitter
+     * asked us to stay away: {@code 429} always (with {@code Retry-After} if
+     * sent, otherwise the configured fallback), {@code 503} only when it carries
      * {@code Retry-After}. Returns empty for every other failure.
      */
-    private Optional<Duration> rateLimitBackoff(RuntimeException e) {
-        Response response = responseOf(e);
+    private Optional<Duration> backoffFor(Response response) {
         if (response == null) {
             return Optional.empty();
         }
         int status = response.getStatus();
-        if (status != 429 && status != Response.Status.SERVICE_UNAVAILABLE.getStatusCode()) {
+        if (status != TOO_MANY_REQUESTS && status != Response.Status.SERVICE_UNAVAILABLE.getStatusCode()) {
             return Optional.empty();
         }
         Optional<Duration> retryAfter = RetryAfter.parse(response.getHeaderString(HttpHeaders.RETRY_AFTER.toString()),
@@ -284,7 +287,7 @@ public class SsfPoller {
         if (retryAfter.isPresent()) {
             return retryAfter;
         }
-        if (status != 429) {
+        if (status != TOO_MANY_REQUESTS) {
             return Optional.empty();
         }
         return Optional.of(config.poll().rateLimit().fallbackBackoff().orElseGet(() -> config.poll().interval()));
@@ -309,7 +312,11 @@ public class SsfPoller {
             // +1ms so the catch-up lands strictly after the deadline and isn't itself skipped.
             catchUpTimerId = vertx.setTimer(effective.toMillis() + 1L, id -> {
                 catchUpTimerId = null;
-                dispatchExecutor.execute(this::pollOnceSafely);
+                try {
+                    dispatchExecutor.execute(this::pollOnceSafely);
+                } catch (RejectedExecutionException shuttingDown) {
+                    LOG.debug("Skipping rate-limit catch-up poll — poller is shutting down");
+                }
             });
         }
         return effective;
@@ -348,18 +355,23 @@ public class SsfPoller {
                 response = pollApi.poll(request);
             } catch (RuntimeException e) {
                 ackStore.requeueAcks(acks);
-                Optional<Duration> backoff = rateLimitBackoff(e);
+                Response httpResponse = responseOf(e);
+                Optional<Duration> backoff = backoffFor(httpResponse);
                 if (backoff.isPresent()) {
+                    boolean rateLimited = httpResponse.getStatus() == TOO_MANY_REQUESTS;
                     Duration effective = applyBackoff(backoff.get());
-                    LOG.warnf("Poll request to %s was rate limited: %s — backing off for %dms%s, "
+                    LOG.warnf("Poll request to %s %s: %s — backing off for %dms%s, "
                             + "re-queueing %d acks for next cycle",
-                            pollEndpoint, summarize(e), effective.toMillis(),
+                            pollEndpoint, rateLimited ? "was rate limited" : "hit an unavailable transmitter",
+                            summarize(e), effective.toMillis(),
                             effective.equals(backoff.get()) ? ""
                                     : " (transmitter asked for " + backoff.get().toMillis()
                                             + "ms, capped by poll.rate-limit.max-backoff)",
                             acks.size());
                     LOG.debugf(e, "Poll request to %s — full stack", pollEndpoint);
-                    return PollOutcome.RATE_LIMITED;
+                    // Only a genuine 429 is "rate limited" in the metrics; a 503 with
+                    // Retry-After is still an outage, we just honor the hint.
+                    return rateLimited ? PollOutcome.RATE_LIMITED : PollOutcome.FAILURE;
                 }
                 LOG.warnf("Poll request to %s failed: %s — re-queueing %d acks for next cycle",
                         pollEndpoint, summarize(e), acks.size());

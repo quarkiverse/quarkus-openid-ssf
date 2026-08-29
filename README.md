@@ -494,7 +494,8 @@ backs off for `poll.rate-limit.fallback-backoff` (default: one
 `poll.rate-limit.max-backoff`. Periodic ticks inside the window are skipped
 and a one-shot catch-up poll fires when it closes, so a long `Retry-After`
 doesn't cost an extra full interval. Acks that were in flight are re-queued.
-The cycle is recorded as `outcome=rate_limited` on `ssf.receiver.poll.cycles`.
+A `429` cycle is recorded as `outcome=rate_limited` on `ssf.receiver.poll.cycles`;
+a `503` still counts as `failure` even though its `Retry-After` is honored.
 
 ### Acknowledgments
 

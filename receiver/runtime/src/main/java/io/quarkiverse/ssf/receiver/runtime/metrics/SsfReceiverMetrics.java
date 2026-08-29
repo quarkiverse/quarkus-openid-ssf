@@ -38,9 +38,9 @@ public interface SsfReceiverMetrics {
         SUCCESS,
         FAILURE,
         /**
-         * The transmitter asked the poller to back off ({@code 429}, or {@code 503}
-         * with {@code Retry-After}); polling is suspended per {@code Retry-After} /
-         * {@code poll.rate-limit.*}.
+         * The transmitter answered {@code 429}; polling is suspended per
+         * {@code Retry-After} / {@code poll.rate-limit.*}. (A {@code 503} with
+         * {@code Retry-After} also suspends polling but counts as {@link #FAILURE}.)
          */
         RATE_LIMITED
     }
