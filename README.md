@@ -8,9 +8,9 @@ A Quarkus extension that lets a Quarkus app act as a [Shared Signals Framework
 (SSF)](https://openid.net/specs/openid-sharedsignals-framework-1_0.html)
 receiver against any spec-compliant SSF transmitter — public providers like
 [caep.dev](https://ssf.caep.dev), on-prem / self-hosted IdPs, or custom
-implementations. Outbound auth is OAuth2-based (`client_credentials` via
-`quarkus-oidc-client`, or a long-lived bearer token), so anything that issues
-OAuth2 access tokens fits.
+implementations. Outbound auth is OAuth2-based — `client_credentials` via the
+built-in provider or `quarkus-oidc-client`, or a long-lived bearer token — so
+anything that issues OAuth2 access tokens fits.
 
 | | |
 |---|---|
@@ -26,7 +26,10 @@ OAuth2 access tokens fits.
 - Accepts inbound SETs via **PUSH** (RFC 8935) — registers a Vert.x route at `/ssf/push`.
 - Pulls SETs via **POLL** (RFC 8936) — periodic Vert.x timer; manual `pollNow()` trigger.
 - Verifies every SET: JWS signature against the transmitter's JWKS, plus
-  `iss` / `iat` / `jti` / `aud` checks per RFC 8417.
+  `iss` / `iat` / `jti` / `aud` checks per RFC 8417. RS256-only with a 2048-bit
+  minimum RSA key by default (CAEP Interop Profile §3.1) — widen via
+  `quarkus.openid-ssf.receiver.set-validation.accepted-algorithms` /
+  `min-rsa-key-size` if your transmitter signs with something else.
 - Manages stream lifecycle in two modes:
     - **`RECEIVER`** (default) — extension calls the transmitter's
       `configuration_endpoint` on startup to discover an existing stream or
@@ -34,7 +37,7 @@ OAuth2 access tokens fits.
     - **`TRANSMITTER`** — operator pre-creates the stream; receiver is given a `stream-id`.
 - Exposes `SsfStreamClient` for the full §8.1.x management surface
   (read / create / patch / replace / delete config, status read+update,
-  add/remove subjects, request verification, POLL).
+  add/remove subjects, request verification).
 - Optional Micrometer metrics + per-event-type counters.
 - Outbound auth: static bearer token, self-contained OAuth2
   `client_credentials` (no extra dep), `quarkus-oidc-client`, or no-op.
@@ -46,7 +49,7 @@ OAuth2 access tokens fits.
 | [`receiver/runtime/`](receiver/runtime/) | Extension runtime: config mapping, `SsfEventHandler` SPI, JWKS resolver, SET verifier, push route, POLL scheduler, stream client, alias resolver, metrics SPI. |
 | [`receiver/deployment/`](receiver/deployment/) | Build-time processor — registers beans + REST clients, picks the right `TransmitterTokenProvider` at build time, wires Micrometer when present. Also contains the smoke test (signed SET round-trip with a stub JWKS). |
 | [`receiver/examples/example-transmitter-managed-stream/`](receiver/examples/example-transmitter-managed-stream/) | Runnable Quarkus app — TRANSMITTER mode + PUSH delivery, env-var-driven, OIDC `client_credentials` for outbound auth. |
-| [`receiver/examples/example-receiver-managed-stream/`](receiver/examples/example-receiver-managed-stream/) | Runnable Quarkus app — RECEIVER mode. Default config is neutral; the `caepdev` profile overlays caep.dev (PUSH + static token), the `keycloak` profile overlays an OIDC + POLL setup. |
+| [`receiver/examples/example-receiver-managed-stream/`](receiver/examples/example-receiver-managed-stream/) | Runnable Quarkus app — RECEIVER mode. Default config is neutral; scenarios compose two profile axes — transmitter (`caepdev` = caep.dev + static token, `keycloak` = OIDC) × delivery (`push`, `poll`) — e.g. `-Dquarkus.profile=caepdev,poll`. |
 
 ## Consumer SPI
 
@@ -108,15 +111,13 @@ export SSF_RECEIVER_TRANSMITTER_ACCESS_TOKEN=<your-caep-dev-token>
 export SSF_RECEIVER_EXPECTED_AUDIENCE=https://my-receiver.example/ssf
 
 mvn -pl receiver/examples/example-receiver-managed-stream quarkus:dev \
-    -Dquarkus.profile=caepdev \
-    -Dquarkus.openid-ssf.receiver.delivery-method=POLL \
+    -Dquarkus.profile=caepdev,poll \
     -Dquarkus.openid-ssf.receiver.poll.interval=5s
 ```
 
 The `caepdev` profile points the receiver at `https://ssf.caep.dev` and
-selects the static-token outbound auth provider. The two `-D` overrides
-flip the example from PUSH (its profile default) to POLL — no inbound
-endpoint to expose. By default the receiver subscribes to
+selects the static-token outbound auth provider; the `poll` overlay selects
+POLL delivery — no inbound endpoint to expose. By default the receiver subscribes to
 `session-revoked` and `credential-change`; edit
 `quarkus.openid-ssf.receiver.events-requested` in `application.properties` to widen.
 
@@ -473,6 +474,8 @@ quarkus.openid-ssf.receiver.poll.max-events=100
 quarkus.openid-ssf.receiver.poll.return-immediately=true    # false → long-poll
 quarkus.openid-ssf.receiver.poll.drain-on-poll=true         # if moreAvailable=true, keep polling
 quarkus.openid-ssf.receiver.poll.timeout=30s
+quarkus.openid-ssf.receiver.poll.rate-limit.max-backoff=5m            # cap on any Retry-After backoff
+#quarkus.openid-ssf.receiver.poll.rate-limit.fallback-backoff=<poll.interval>  # 429 without Retry-After
 # Override only if the stream's delivery.endpoint_url isn't queryable:
 #quarkus.openid-ssf.receiver.poll.endpoint-url=https://transmitter.example/ssf/poll/<stream>
 ```
@@ -480,6 +483,18 @@ quarkus.openid-ssf.receiver.poll.timeout=30s
 The poll endpoint URL is normally **discovered** from the stream's
 `delivery.endpoint_url` (returned by the configuration endpoint). For
 receiver-managed streams the transmitter assigns it during `createStream`.
+
+### Rate limiting
+
+If the transmitter answers `429 Too Many Requests` (or `503` with a
+`Retry-After` header), the poller honors `Retry-After` — delta-seconds or an
+HTTP-date — and sends nothing until that deadline. A `429` without the header
+backs off for `poll.rate-limit.fallback-backoff` (default: one
+`poll.interval`). Either way the wait is capped by
+`poll.rate-limit.max-backoff`. Periodic ticks inside the window are skipped
+and a one-shot catch-up poll fires when it closes, so a long `Retry-After`
+doesn't cost an extra full interval. Acks that were in flight are re-queued.
+The cycle is recorded as `outcome=rate_limited` on `ssf.receiver.poll.cycles`.
 
 ### Acknowledgments
 
@@ -503,6 +518,10 @@ and drive it from app code:
 // from a REST endpoint, scheduled job, message handler, …:
 poller.pollNow();
 ```
+
+`pollNow()` is a no-op while a poll is already in flight or a rate-limit
+backoff is active; `poller.rateLimitRemaining()` tells you how long the latter
+lasts.
 
 ## Outbound auth to the transmitter
 
@@ -540,7 +559,7 @@ discovery) are unauthenticated by SSF/OIDC convention — the extension does
 ## Metrics (optional)
 
 Add `quarkus-micrometer-registry-prometheus` (or another registry extension)
-and the extension publishes the following meters under `quarkus.openid-ssf.receiver.*`. Without
+and the extension publishes the following meters under `ssf.receiver.*`. Without
 it, a no-op SPI is in effect — zero behavior change.
 
 | Meter | Type | Tags |
@@ -548,7 +567,7 @@ it, a no-op SPI is in effect — zero behavior change.
 | `ssf.receiver.push.accepted` | counter | — |
 | `ssf.receiver.push.rejected` | counter | `reason` ∈ {`auth`, `body`, `verify`} |
 | `ssf.receiver.push.handler.errors` | counter | — |
-| `ssf.receiver.poll.cycles` | timer | `outcome` ∈ {`success`, `failure`} |
+| `ssf.receiver.poll.cycles` | timer | `outcome` ∈ {`success`, `failure`, `rate_limited`} |
 | `ssf.receiver.poll.events.received` | counter | — |
 | `ssf.receiver.poll.events.handled` | counter | — |
 | `ssf.receiver.poll.events.failed` | counter | `reason` ∈ {`verify`, `handler`} |
@@ -653,8 +672,8 @@ mvn -pl receiver/runtime,receiver/deployment test                      # full la
 # Run the examples — see each example's README for the env vars they need.
 mvn -pl receiver/examples/example-transmitter-managed-stream quarkus:dev
 mvn -pl receiver/examples/example-receiver-managed-stream    quarkus:dev
-mvn -pl receiver/examples/example-receiver-managed-stream    quarkus:dev -Dquarkus.profile=caepdev
-mvn -pl receiver/examples/example-receiver-managed-stream    quarkus:dev -Dquarkus.profile=keycloak
+mvn -pl receiver/examples/example-receiver-managed-stream    quarkus:dev -Dquarkus.profile=caepdev,push
+mvn -pl receiver/examples/example-receiver-managed-stream    quarkus:dev -Dquarkus.profile=keycloak,poll
 ```
 
 ## Out of scope (today)

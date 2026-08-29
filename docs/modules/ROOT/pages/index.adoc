@@ -41,7 +41,7 @@ implementations.
 ** `TRANSMITTER`: operator pre-creates the stream and provides a `stream-id`.
 * Exposes `SsfStreamClient` for the full SSF §8.1.x management surface
   (read / create / patch / replace / delete config, status read+update,
-  add/remove subjects, request verification, POLL).
+  add/remove subjects, request verification).
 * Optional Micrometer metrics + per-event-type counters.
 * Outbound auth: static bearer token, self-contained OAuth2
   `client_credentials` (no extra dep), `quarkus-oidc-client`, or no-op.
