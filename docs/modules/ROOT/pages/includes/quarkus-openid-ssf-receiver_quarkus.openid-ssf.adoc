@@ -368,6 +368,48 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
 |`+++30S+++`
 
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-rate-limit-fallback-backoff]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-rate-limit-fallback-backoff[`+++quarkus.openid-ssf.receiver.poll.rate-limit.fallback-backoff+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.rate-limit.fallback-backoff+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+Backoff applied when the transmitter answers `429` _without_ a `Retry-After` header. If absent (the default), the poller waits one `poll.interval` before contacting the transmitter again.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_POLL_RATE_LIMIT_FALLBACK_BACKOFF+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_POLL_RATE_LIMIT_FALLBACK_BACKOFF+++`
+endif::add-copy-button-to-env-var[]
+--
+|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
+|
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-rate-limit-max-backoff]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-rate-limit-max-backoff[`+++quarkus.openid-ssf.receiver.poll.rate-limit.max-backoff+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.rate-limit.max-backoff+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+Upper bound for any rate-limit backoff, whether it comes from a `Retry-After` header or from `fallback-backoff`. Protects the receiver from a transmitter that asks it to stay away for hours. Defaults to `5m`.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_POLL_RATE_LIMIT_MAX_BACKOFF+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_POLL_RATE_LIMIT_MAX_BACKOFF+++`
+endif::add-copy-button-to-env-var[]
+--
+|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
+|`+++5M+++`
+
 a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-receiver-managed-register-stream]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-receiver-managed-register-stream[`+++quarkus.openid-ssf.receiver.receiver-managed.register-stream+++`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.receiver-managed.register-stream+++[]

@@ -1,8 +1,11 @@
 package io.quarkiverse.ssf.receiver.runtime.delivery.poll;
 
 import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -13,6 +16,8 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response;
 
 import org.eclipse.microprofile.rest.client.RestClientBuilder;
 import org.jboss.logging.Logger;
@@ -36,6 +41,7 @@ import io.quarkiverse.ssf.receiver.runtime.stream.StreamConfiguration;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import io.vertx.core.Vertx;
+import io.vertx.core.http.HttpHeaders;
 
 /**
  * RFC 8936 poll loop. When {@code quarkus.openid-ssf.receiver.delivery-method=POLL}, this bean:
@@ -47,6 +53,12 @@ import io.vertx.core.Vertx;
  * application's {@link SsfEventHandler}.</li>
  * <li>Acknowledges successfully-processed {@code jti}s on the next request so the
  * transmitter can advance its cursor.</li>
+ * <li>Backs off when the transmitter rate-limits the endpoint ({@code 429}, or
+ * {@code 503} with {@code Retry-After}): polling is suspended until the
+ * {@code Retry-After} deadline (or {@code poll.rate-limit.fallback-backoff}),
+ * capped by {@code poll.rate-limit.max-backoff}. Periodic ticks and
+ * {@link #pollNow()} calls inside that window are skipped; with auto-start a
+ * one-shot catch-up poll fires as soon as the window closes.</li>
  * </ol>
  *
  * <p>
@@ -95,6 +107,15 @@ public class SsfPoller {
     private volatile URI pollEndpoint;
     private volatile SsfTransmitterPollApi pollApi;
     private volatile Long timerId;
+
+    /**
+     * {@link System#nanoTime()} before which no poll request may be sent, set on
+     * a rate-limited response. {@code 0} means "not backing off". Monotonic so a
+     * wall-clock jump can't extend or collapse the window.
+     */
+    private volatile long backoffUntilNanos;
+    /** One-shot Vert.x timer that resumes polling when the backoff window closes (auto-start only). */
+    private volatile Long catchUpTimerId;
 
     void onStart(@Observes @Priority(300) StartupEvent event) {
         if (!config.enabled()) {
@@ -171,6 +192,7 @@ public class SsfPoller {
             vertx.cancelTimer(id);
             timerId = null;
         }
+        cancelCatchUpTimer();
         dispatchExecutor.shutdown();
     }
 
@@ -195,6 +217,7 @@ public class SsfPoller {
         }
         long startNanos = System.nanoTime();
         PollOutcome outcome = PollOutcome.FAILURE;
+        boolean skipped = false;
         try {
             // Receiver-managed + POLL: the registrar runs on a background
             // virtual thread, so the first few cycles after boot may fire
@@ -204,13 +227,110 @@ public class SsfPoller {
                 outcome = PollOutcome.SUCCESS;
                 return;
             }
+            Optional<Duration> backoff = rateLimitRemaining();
+            if (backoff.isPresent()) {
+                // Transmitter asked us to stay away (Retry-After). Not a cycle —
+                // don't record it as one.
+                LOG.debugf("Skipping poll tick — transmitter rate limit in effect for another %dms",
+                        backoff.get().toMillis());
+                skipped = true;
+                return;
+            }
             outcome = pollOnce();
         } catch (RuntimeException e) {
             LOG.warnf("Poll cycle failed: %s", e.getMessage());
         } finally {
-            metrics.pollCycle(outcome, System.nanoTime() - startNanos);
+            if (!skipped) {
+                metrics.pollCycle(outcome, System.nanoTime() - startNanos);
+            }
             polling.set(false);
         }
+    }
+
+    /**
+     * Time left in the current rate-limit backoff window, or empty when the
+     * poller is free to contact the transmitter. Lets an application that drives
+     * polling via {@link #pollNow()} find out why a call was a no-op.
+     */
+    public Optional<Duration> rateLimitRemaining() {
+        long until = backoffUntilNanos;
+        if (until == 0L) {
+            return Optional.empty();
+        }
+        long remaining = until - System.nanoTime();
+        if (remaining <= 0L) {
+            return Optional.empty();
+        }
+        return Optional.of(Duration.ofNanos(remaining));
+    }
+
+    /**
+     * Turns a failed poll request into a backoff duration when the transmitter
+     * rate-limited us: {@code 429} always (with {@code Retry-After} if sent,
+     * otherwise the configured fallback), {@code 503} only when it carries
+     * {@code Retry-After}. Returns empty for every other failure.
+     */
+    private Optional<Duration> rateLimitBackoff(RuntimeException e) {
+        Response response = responseOf(e);
+        if (response == null) {
+            return Optional.empty();
+        }
+        int status = response.getStatus();
+        if (status != 429 && status != Response.Status.SERVICE_UNAVAILABLE.getStatusCode()) {
+            return Optional.empty();
+        }
+        Optional<Duration> retryAfter = RetryAfter.parse(response.getHeaderString(HttpHeaders.RETRY_AFTER.toString()),
+                Instant.now());
+        if (retryAfter.isPresent()) {
+            return retryAfter;
+        }
+        if (status != 429) {
+            return Optional.empty();
+        }
+        return Optional.of(config.poll().rateLimit().fallbackBackoff().orElseGet(() -> config.poll().interval()));
+    }
+
+    /**
+     * Opens a backoff window of {@code requested}, clamped to
+     * {@code poll.rate-limit.max-backoff}, and — when the periodic timer is
+     * running — arms a one-shot catch-up poll for the moment the window closes
+     * so a long {@code Retry-After} doesn't cost an extra full interval.
+     * Returns the effective (clamped) backoff.
+     */
+    private Duration applyBackoff(Duration requested) {
+        Duration max = config.poll().rateLimit().maxBackoff();
+        Duration effective = requested.compareTo(max) > 0 ? max : requested;
+        if (effective.isNegative()) {
+            effective = Duration.ZERO;
+        }
+        backoffUntilNanos = System.nanoTime() + effective.toNanos();
+        if (config.poll().autoStart() && !effective.isZero()) {
+            cancelCatchUpTimer();
+            // +1ms so the catch-up lands strictly after the deadline and isn't itself skipped.
+            catchUpTimerId = vertx.setTimer(effective.toMillis() + 1L, id -> {
+                catchUpTimerId = null;
+                dispatchExecutor.execute(this::pollOnceSafely);
+            });
+        }
+        return effective;
+    }
+
+    private void cancelCatchUpTimer() {
+        Long id = catchUpTimerId;
+        if (id != null) {
+            vertx.cancelTimer(id);
+            catchUpTimerId = null;
+        }
+    }
+
+    /** Unwraps the JAX-RS {@link Response} from a REST client failure, or {@code null} if there is none. */
+    private static Response responseOf(Throwable t) {
+        for (Throwable cause = t; cause != null; cause = cause.getCause()) {
+            if (cause instanceof WebApplicationException wae && wae.getResponse() != null) {
+                return wae.getResponse();
+            }
+        }
+        return null;
     }
 
     private PollOutcome pollOnce() {
@@ -227,10 +347,23 @@ public class SsfPoller {
             try {
                 response = pollApi.poll(request);
             } catch (RuntimeException e) {
+                ackStore.requeueAcks(acks);
+                Optional<Duration> backoff = rateLimitBackoff(e);
+                if (backoff.isPresent()) {
+                    Duration effective = applyBackoff(backoff.get());
+                    LOG.warnf("Poll request to %s was rate limited: %s — backing off for %dms%s, "
+                            + "re-queueing %d acks for next cycle",
+                            pollEndpoint, summarize(e), effective.toMillis(),
+                            effective.equals(backoff.get()) ? ""
+                                    : " (transmitter asked for " + backoff.get().toMillis()
+                                            + "ms, capped by poll.rate-limit.max-backoff)",
+                            acks.size());
+                    LOG.debugf(e, "Poll request to %s — full stack", pollEndpoint);
+                    return PollOutcome.RATE_LIMITED;
+                }
                 LOG.warnf("Poll request to %s failed: %s — re-queueing %d acks for next cycle",
                         pollEndpoint, summarize(e), acks.size());
                 LOG.debugf(e, "Poll request to %s — full stack", pollEndpoint);
-                ackStore.requeueAcks(acks);
                 return PollOutcome.FAILURE;
             }
 
@@ -328,6 +461,9 @@ public class SsfPoller {
      * <p>
      * Returns silently if a poll is already in flight — concurrent invocations
      * coalesce into a single in-progress cycle to keep the ack queue consistent.
+     * Also returns without contacting the transmitter while a rate-limit backoff
+     * ({@code 429} / {@code Retry-After}) is in effect; check
+     * {@link #rateLimitRemaining()} to tell the two apart.
      */
     public void pollNow() {
         if (!config.enabled()) {

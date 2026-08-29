@@ -36,7 +36,13 @@ public interface SsfReceiverMetrics {
     /** Outcome of a poll cycle — surfaced as a Micrometer tag. */
     enum PollOutcome {
         SUCCESS,
-        FAILURE
+        FAILURE,
+        /**
+         * The transmitter asked the poller to back off ({@code 429}, or {@code 503}
+         * with {@code Retry-After}); polling is suspended per {@code Retry-After} /
+         * {@code poll.rate-limit.*}.
+         */
+        RATE_LIMITED
     }
 
     /** Which delivery path an event arrived through — surfaced as the {@code delivery} tag. */

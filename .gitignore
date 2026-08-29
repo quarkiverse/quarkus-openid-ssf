@@ -13,6 +13,11 @@ target/
 *.iml
 *.ipr
 
+# Ignore examples IDE files
+receiver/examples/*/.idea/
+
+scratch/
+
 ### Eclipse ###
 .apt_generated
 .classpath

@@ -326,6 +326,31 @@ public interface SsfReceiverConfig {
         /** Connect/read timeout for outbound poll requests. Defaults to 30s. */
         @WithDefault("30s")
         Duration timeout();
+
+        /**
+         * How the poller reacts when the transmitter rate-limits the poll endpoint
+         * ({@code 429 Too Many Requests}, or {@code 503 Service Unavailable} with a
+         * {@code Retry-After} header).
+         */
+        RateLimit rateLimit();
+    }
+
+    interface RateLimit {
+        /**
+         * Backoff applied when the transmitter answers {@code 429} <em>without</em> a
+         * {@code Retry-After} header. If absent (the default), the poller waits one
+         * {@code poll.interval} before contacting the transmitter again.
+         */
+        Optional<Duration> fallbackBackoff();
+
+        /**
+         * Upper bound for any rate-limit backoff, whether it comes from a
+         * {@code Retry-After} header or from {@code fallback-backoff}. Protects the
+         * receiver from a transmitter that asks it to stay away for hours. Defaults
+         * to {@code 5m}.
+         */
+        @WithDefault("5m")
+        Duration maxBackoff();
     }
 
     interface ReceiverManaged {
