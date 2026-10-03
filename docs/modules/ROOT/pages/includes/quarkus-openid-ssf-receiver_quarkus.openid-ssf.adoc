@@ -948,6 +948,27 @@ endif::add-copy-button-to-env-var[]
 |Map<String,String>
 |
 
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-understood-subject-members]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-understood-subject-members[`quarkus.openid-ssf.receiver.understood-subject-members`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.understood-subject-members+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+The members of a complex subject the application interprets. A transmitter can declare members critical (`critical_subject_members` in its metadata); a SET whose subject has such a member that is not listed here is rejected as `invalid_request`, as the SSF specification requires critical members to be interpreted by the receiver. Defaults to the members `SsfSubject` gives access to.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_UNDERSTOOD_SUBJECT_MEMBERS+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_UNDERSTOOD_SUBJECT_MEMBERS+++`
+endif::add-copy-button-to-env-var[]
+--
+|list of string
+|`+++user+++`, `+++session+++`, `+++device+++`, `+++application+++`, `+++tenant+++`, `+++org_unit+++`, `+++group+++`
+
 a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-endpoint-path]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-endpoint-path[`quarkus.openid-ssf.receiver.push.endpoint-path`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.push.endpoint-path+++[]

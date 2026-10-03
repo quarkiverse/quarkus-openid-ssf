@@ -2,6 +2,7 @@ package io.quarkiverse.ssf.receiver.runtime;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -72,6 +73,17 @@ public interface SsfReceiverConfig {
      */
     @ConfigDocMapKey("alias")
     Map<String, String> eventAliases();
+
+    /**
+     * The members of a complex subject the application interprets. A transmitter can
+     * declare members critical ({@code critical_subject_members} in its metadata); a SET
+     * whose subject has such a member that is not listed here is rejected as
+     * {@code invalid_request}, as the SSF specification requires critical members to be
+     * interpreted by the receiver. Defaults to the members {@code SsfSubject} gives access
+     * to.
+     */
+    @WithDefault("user,session,device,application,tenant,org_unit,group")
+    List<String> understoodSubjectMembers();
 
     /** The push endpoint of this application (RFC 8935), shared by all transmitters. */
     PushEndpoint push();
