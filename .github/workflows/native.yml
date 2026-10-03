@@ -59,9 +59,9 @@ jobs:
           java-version: 21
           cache: 'maven'
 
-      # Install the extension first so the example build can resolve it locally.
+      # Install the extension and its parent poms first (-am) so the example build can resolve them locally.
       - name: Install extension
-        run: mvn -B -DskipTests -Dno-format -pl receiver/runtime,receiver/deployment install
+        run: mvn -B -DskipTests -Dno-format -pl receiver/runtime,receiver/deployment -am install
 
       - name: Native build and integration tests
         run: |
