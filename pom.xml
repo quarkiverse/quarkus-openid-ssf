@@ -92,6 +92,7 @@
                                         <excludes>
                                             <exclude>io.quarkiverse.openid-ssf:*-integration-tests</exclude>
                                             <exclude>io.quarkiverse.openid-ssf:*-example-*</exclude>
+                                            <exclude>io.quarkiverse.openid-ssf:*-conformance</exclude>
                                             <exclude>io.quarkiverse.openid-ssf:quarkus-openid-ssf-docs</exclude>
                                         </excludes>
                                     </modules>

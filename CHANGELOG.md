@@ -31,6 +31,9 @@ build-time processor.
 - `SsfTransmitterCustomizer` beans customize every transmitter before it is built.
 - `oidc.client-name` picks a named `quarkus.oidc-client.<name>` for a transmitter.
 - Tests of applications can use `org.easyssf:easyssf-test` (`TestTransmitter`).
+- `receiver/conformance`: a receiver under test for the OpenID conformance suite
+  and tests that run the suite's four SSF receiver plans against it, with
+  `org.easyssf:easyssf-test-conformance` (Docker; `mvn -Pconformance verify`).
 - Two more examples, modelled on the easyssf Spring Boot examples: a resource
   server that rejects the access tokens of revoked sessions and a web application
   that ends revoked sessions, with a Keycloak Docker Compose setup.

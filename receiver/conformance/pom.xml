@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.quarkiverse.openid-ssf</groupId>
+        <artifactId>quarkus-openid-ssf-receiver-parent</artifactId>
+        <version>999-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>quarkus-openid-ssf-receiver-conformance</artifactId>
+    <packaging>quarkus</packaging>
+    <name>Quarkus OpenID SSF - Receiver - Conformance</name>
+    <description>Receiver under test for the OpenID Foundation conformance suite's SSF receiver tests</description>
+
+    <properties>
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <!-- the tests against the OpenID conformance suite need Docker, see README.md -->
+        <conformance.groups />
+        <conformance.excludedGroups>conformance</conformance.excludedGroups>
+        <!-- how the tests start the suite and expose the receiver, see ConformanceSettings; empty: its defaults -->
+        <cts.suite.image />
+        <cts.suite.nginx-image />
+        <cts.suite.mongodb-image />
+        <cts.suite.port />
+        <cts.receiver.port />
+        <cts.receiver.push-url />
+    </properties>
+
+    <dependencies>
+        <!--
+            The suite, the plans, the scenarios the receiver under test plays and the receiver
+            itself, assembled from the plain easyssf receiver library for every test run, see
+            ConformanceRun. The Quarkus extension is not involved, as the Spring Boot starter is
+            not in easyssf's own conformance module.
+        -->
+        <dependency>
+            <groupId>org.easyssf</groupId>
+            <artifactId>easyssf-test-conformance</artifactId>
+            <version>${easyssf.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest-jackson</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- easyssf's in-process test transmitter, for the scenario test without the suite -->
+        <dependency>
+            <groupId>org.easyssf</groupId>
+            <artifactId>easyssf-test</artifactId>
+            <version>${easyssf.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>io.quarkus</groupId>
+                <artifactId>quarkus-maven-plugin</artifactId>
+                <extensions>true</extensions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <groups>${conformance.groups}</groups>
+                    <excludedGroups>${conformance.excludedGroups}</excludedGroups>
+                    <!-- the suite runs one module at a time, and a plan takes a while -->
+                    <forkedProcessTimeoutInSeconds>5400</forkedProcessTimeoutInSeconds>
+                    <systemPropertyVariables>
+                        <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                        <maven.home>${maven.home}</maven.home>
+                        <cts.suite.image>${cts.suite.image}</cts.suite.image>
+                        <cts.suite.nginx-image>${cts.suite.nginx-image}</cts.suite.nginx-image>
+                        <cts.suite.mongodb-image>${cts.suite.mongodb-image}</cts.suite.mongodb-image>
+                        <cts.suite.port>${cts.suite.port}</cts.suite.port>
+                        <cts.receiver.port>${cts.receiver.port}</cts.receiver.port>
+                        <cts.receiver.push-url>${cts.receiver.push-url}</cts.receiver.push-url>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <!-- runs only the tests against the OpenID conformance suite: mvn -Pconformance verify -->
+            <id>conformance</id>
+            <properties>
+                <conformance.groups>conformance</conformance.groups>
+                <conformance.excludedGroups />
+            </properties>
+        </profile>
+    </profiles>
+</project>

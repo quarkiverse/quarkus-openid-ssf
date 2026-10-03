@@ -1,0 +1,70 @@
+# Runs the receiver conformance tests of receiver/conformance against the OpenID conformance
+# suite, which Testcontainers starts on the runner. One job per test plan, each with its own
+# suite. See receiver/conformance/README.md for the plans and the suite image.
+name: Conformance
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite-image:
+        description: >-
+          Conformance suite image. Empty: the one easyssf's ConformanceSettings names.
+        required: false
+        default: ''
+      nginx-image:
+        description: >-
+          Its nginx image. Empty: the one easyssf's ConformanceSettings names.
+        required: false
+        default: ''
+  # Later: nightly, once a suite release contains the SSF test fixes made since release-v5.3.1
+  # (see "Which suite" in receiver/conformance/README.md) and easyssf is on Maven Central.
+  # schedule:
+  #   - cron: '17 2 * * *'   # 02:17 UTC, every night
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        plan:
+          - Ssf10PushReceiverConformanceTest
+          - Ssf10PollReceiverConformanceTest
+          - CaepInterop10PushReceiverConformanceTest
+          - CaepInterop10PollReceiverConformanceTest
+    name: ${{ matrix.plan }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Build the modules the receiver under test needs
+        run: mvn -B --no-transfer-progress -DskipTests -Dno-format -pl receiver/conformance -am install
+
+      - name: Run the ${{ matrix.plan }} plan
+        env:
+          SUITE_IMAGE: ${{ inputs.suite-image }}
+          NGINX_IMAGE: ${{ inputs.nginx-image }}
+        run: >-
+          mvn -B --no-transfer-progress -Dno-format -pl receiver/conformance -Pconformance verify
+          -Dtest=${{ matrix.plan }} -Dsurefire.failIfNoSpecifiedTests=false
+          ${SUITE_IMAGE:+-Dcts.suite.image="$SUITE_IMAGE"}
+          ${NGINX_IMAGE:+-Dcts.suite.nginx-image="$NGINX_IMAGE"}
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-${{ matrix.plan }}
+          path: receiver/conformance/target/surefire-reports/
+          if-no-files-found: ignore
+          retention-days: 14

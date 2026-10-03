@@ -21,5 +21,6 @@
         <module>examples/example-receiver-managed-stream</module>
         <module>examples/example-resource-server</module>
         <module>examples/example-oidc-client</module>
+        <module>conformance</module>
     </modules>
 </project>
