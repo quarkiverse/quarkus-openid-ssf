@@ -30,9 +30,12 @@ public class AuthResource {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public Response check() {
+        // getClaim is generic: assign it before String.valueOf picks the char[] overload
+        Object user = idToken.getClaim("preferred_username");
+        Object sid = idToken.getClaim("sid");
         return Response.ok(Map.of(
-                "user", String.valueOf(idToken.getClaim("preferred_username")),
-                "sid", String.valueOf(idToken.getClaim("sid")),
+                "user", String.valueOf(user),
+                "sid", String.valueOf(sid),
                 "checkedAt", Instant.now().toString()))
                 .header("Cache-Control", "no-store")
                 .build();
