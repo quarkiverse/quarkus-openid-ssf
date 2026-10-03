@@ -658,6 +658,32 @@ endif::add-copy-button-to-env-var[]
 |boolean
 |`+++true+++`
 
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-subject-compatibility]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-subject-compatibility[`quarkus.openid-ssf.receiver.set-validation.subject-compatibility`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.set-validation.subject-compatibility+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`quarkus.openid-ssf.receiver."transmitter-name".set-validation.subject-compatibility`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.subject-compatibility+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+How strictly the subject of a SET is validated: `strict-ssf-1-0` requires the top-level `sub_id` claim of SSF 1.0, `legacy` accepts SETs of transmitters following earlier drafts, which put the subject into the event payload.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_SET_VALIDATION_SUBJECT_COMPATIBILITY+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_SET_VALIDATION_SUBJECT_COMPATIBILITY+++`
+endif::add-copy-button-to-env-var[]
+--
+a|`strict-ssf-1-0`, `legacy`
+|`+++strict-ssf-1-0+++`
+
 a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-clock-skew]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-clock-skew[`quarkus.openid-ssf.receiver.set-validation.clock-skew`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.set-validation.clock-skew+++[]

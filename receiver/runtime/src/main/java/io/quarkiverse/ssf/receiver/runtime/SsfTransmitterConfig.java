@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.easyssf.core.event.SubjectCompatibilityMode;
+
 import io.quarkus.runtime.annotations.ConfigDocMapKey;
 import io.quarkus.runtime.annotations.ConfigGroup;
 import io.smallrye.config.WithDefault;
@@ -228,6 +230,15 @@ public interface SsfTransmitterConfig {
         /** Whether a SET must be explicitly typed with a {@code typ} header of {@code secevent+jwt}. */
         @WithDefault("true")
         boolean requireTypeHeader();
+
+        /**
+         * How strictly the subject of a SET is validated: {@code strict-ssf-1-0} requires
+         * the top-level {@code sub_id} claim of SSF 1.0, {@code legacy} accepts SETs of
+         * transmitters following earlier drafts, which put the subject into the event
+         * payload.
+         */
+        @WithDefault("STRICT_SSF_1_0")
+        SubjectCompatibilityMode subjectCompatibility();
 
         /** Tolerated clock skew when checking that a SET was not issued in the future. */
         @WithDefault("60s")

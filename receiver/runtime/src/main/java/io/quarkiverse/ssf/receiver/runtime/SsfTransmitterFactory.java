@@ -105,6 +105,7 @@ public final class SsfTransmitterFactory {
         }
         verifier.setMinRsaKeySize(validation.minRsaKeySize());
         verifier.setRequireTypeHeader(validation.requireTypeHeader());
+        verifier.setSubjectCompatibilityMode(validation.subjectCompatibility());
         verifier.setClockSkew(validation.clockSkew());
         return verifier;
     }
