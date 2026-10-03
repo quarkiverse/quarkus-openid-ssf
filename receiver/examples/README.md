@@ -11,8 +11,8 @@ Four applications that use the `quarkus-openid-ssf-receiver` extension.
 | [`example-transmitter-managed-stream/`](example-transmitter-managed-stream) | 28080 | Like the one above, for a stream an operator created at the transmitter (`stream-management=TRANSMITTER` with a `stream-id`). |
 
 The resource server and the OIDC client contain no SSF specific code apart from configuration, a
-`SecurityIdentityAugmentor` that rejects revoked tokens, and an optional `SsfEventHandler` that
-logs the events. Both switch proactive authentication off (`quarkus.http.auth.proactive=false`), so
+few lines that reject revoked tokens (a `SecurityIdentityAugmentor` in the resource server, a
+`TokenStateManager` in the OIDC client), and an optional `SsfEventHandler` that logs the events. Both switch proactive authentication off (`quarkus.http.auth.proactive=false`), so
 that `quarkus-oidc` does not take the `Authorization` header Keycloak sends to the push endpoint
 for an access token. Both manage their own stream: on startup they authenticate with the service
 account of their Keycloak client and register a PUSH stream for it (`Created SSF stream …`), after
@@ -137,9 +137,12 @@ mvn -pl receiver/examples/example-oidc-client quarkus:dev
    redirects to the login.
 
 The page polls `GET /auth/check` every five seconds and whenever its tab becomes visible. The
-endpoint does not call Keycloak: `SessionRevocation` fails the authentication of the ID token in
-the session cookie once the `session-revoked` event arrived, so the check answers 200 while the
-session exists and sends the browser to the login once it is gone.
+endpoint does not call Keycloak: `RevocationAwareTokenStateManager`, a `TokenStateManager` around
+the default one of `quarkus-oidc`, refuses the tokens of the session cookie once the
+`session-revoked` event arrived (`SessionRevocation` produces the easyssf event handler and the
+store it checks). `quarkus-oidc` then removes the cookie and sends the browser to the login, the
+same way it ends a session on a back-channel logout; the check answers 200 while the session
+exists.
 
 The client `example-oidc-client` has neither a back-channel nor a front-channel logout URL in
 Keycloak. The application learns about the logout only through the `session-revoked` event, which
