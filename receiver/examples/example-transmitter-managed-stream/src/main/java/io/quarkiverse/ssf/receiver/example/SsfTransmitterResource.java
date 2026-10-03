@@ -11,8 +11,9 @@ import jakarta.ws.rs.core.MediaType;
 import io.quarkiverse.ssf.receiver.runtime.stream.SsfReceiverStreamClient;
 
 /**
- * Transmitter-side information that is not bound to a single stream: the parsed
- * {@code ssf-configuration} metadata document.
+ * Demo endpoint, not something a real receiver exposes: it makes the receiver's view of
+ * the transmitter visible, the {@code ssf-configuration} metadata it resolved, so that
+ * it can be inspected while trying the example. It is unauthenticated.
  */
 @Path("/transmitter")
 public class SsfTransmitterResource {
