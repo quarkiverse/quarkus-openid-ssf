@@ -15,8 +15,10 @@ import org.easyssf.receiver.transmitter.SsfTransmitter;
 import io.quarkiverse.ssf.receiver.runtime.stream.SsfReceiverStreamClient;
 
 /**
- * Transmitter-side information plus the receiver-specific state: the {@code stream_id}
- * the registrar discovered or created.
+ * Demo endpoints, not something a real receiver exposes: they make the receiver's view
+ * of the transmitter visible, the metadata it resolved and the stream the registrar
+ * discovered or created, so that it can be inspected while trying the example. They
+ * are unauthenticated.
  */
 @Path("/transmitter")
 public class SsfTransmitterResource {
