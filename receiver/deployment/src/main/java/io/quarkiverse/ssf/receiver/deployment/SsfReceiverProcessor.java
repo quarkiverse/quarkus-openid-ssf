@@ -1,55 +1,33 @@
 package io.quarkiverse.ssf.receiver.deployment;
 
-import org.eclipse.microprofile.config.ConfigProvider;
 import org.jboss.logging.Logger;
 
-import io.quarkiverse.ssf.receiver.runtime.auth.NoopTransmitterTokenProvider;
-import io.quarkiverse.ssf.receiver.runtime.auth.StaticTransmitterTokenProvider;
-import io.quarkiverse.ssf.receiver.runtime.dedup.InMemorySsfJtiDedupStore;
-import io.quarkiverse.ssf.receiver.runtime.delivery.poll.InMemorySsfPollAckStore;
-import io.quarkiverse.ssf.receiver.runtime.delivery.poll.SsfPoller;
-import io.quarkiverse.ssf.receiver.runtime.delivery.poll.SsfTransmitterPollApi;
-import io.quarkiverse.ssf.receiver.runtime.delivery.push.JwksResolver;
-import io.quarkiverse.ssf.receiver.runtime.delivery.push.SetVerifier;
+import io.quarkiverse.ssf.receiver.runtime.SsfReceiverLifecycle;
+import io.quarkiverse.ssf.receiver.runtime.SsfReceiverProducers;
+import io.quarkiverse.ssf.receiver.runtime.dedup.InMemorySsfJtiDedupStoreProducer;
+import io.quarkiverse.ssf.receiver.runtime.delivery.poll.SsfPollScheduler;
 import io.quarkiverse.ssf.receiver.runtime.delivery.push.SsfPushRoute;
 import io.quarkiverse.ssf.receiver.runtime.event.LoggingSsfEventHandler;
-import io.quarkiverse.ssf.receiver.runtime.event.SsfAliases;
-import io.quarkiverse.ssf.receiver.runtime.event.SsfReceiverStartupValidator;
-import io.quarkiverse.ssf.receiver.runtime.metadata.SsfConfigurationResolver;
-import io.quarkiverse.ssf.receiver.runtime.metadata.SsfTransmitterMetadataApi;
-import io.quarkiverse.ssf.receiver.runtime.metrics.NoopSsfReceiverMetrics;
-import io.quarkiverse.ssf.receiver.runtime.stream.ReceiverManagedStreamRegistrar;
-import io.quarkiverse.ssf.receiver.runtime.stream.ReceiverManagedStreamState;
-import io.quarkiverse.ssf.receiver.runtime.stream.SsfStreamClient;
-import io.quarkiverse.ssf.receiver.runtime.stream.SsfTransmitterStreamConfigurationApi;
-import io.quarkiverse.ssf.receiver.runtime.stream.TransmitterManagedStreamProbe;
-import io.quarkiverse.ssf.receiver.runtime.stream.status.SsfTransmitterStreamStatusApi;
-import io.quarkiverse.ssf.receiver.runtime.stream.subjects.SsfTransmitterStreamAddSubjectApi;
-import io.quarkiverse.ssf.receiver.runtime.stream.subjects.SsfTransmitterStreamRemoveSubjectApi;
-import io.quarkiverse.ssf.receiver.runtime.stream.verification.SsfTransmitterStreamVerificationApi;
+import io.quarkiverse.ssf.receiver.runtime.stream.SsfReceiverStreamClient;
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.deployment.Capabilities;
+import io.quarkus.deployment.Capability;
 import io.quarkus.deployment.annotations.BuildStep;
-import io.quarkus.deployment.builditem.AdditionalIndexedClassesBuildItem;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
+import io.quarkus.deployment.builditem.IndexDependencyBuildItem;
+import io.quarkus.deployment.builditem.nativeimage.ReflectiveClassBuildItem;
 
 class SsfReceiverProcessor {
 
     private static final Logger LOG = Logger.getLogger(SsfReceiverProcessor.class);
 
     private static final String FEATURE = "ssf-receiver";
-    private static final String OIDC_CLIENT_CAPABILITY = "io.quarkus.oidc.client";
-    private static final String OIDC_TOKEN_PROVIDER_CLASS = "io.quarkiverse.ssf.receiver.runtime.auth.OidcTransmitterTokenProvider";
-    private static final String STATIC_TOKEN_PROPERTY = "quarkus.openid-ssf.receiver.transmitter-access-token";
-    private static final String OAUTH2_TOKEN_ENDPOINT_PROPERTY = "quarkus.openid-ssf.receiver.oauth2.token-endpoint";
-    /**
-     * The capability advertised by {@code quarkus-micrometer} (and pulled in transitively
-     * by every {@code quarkus-micrometer-registry-*} extension). Note the capability
-     * name is {@code io.quarkus.metrics}, NOT {@code io.quarkus.micrometer} — Quarkus
-     * uses the generic name so SmallRye Metrics could in theory provide it too.
-     */
-    private static final String MICROMETER_CAPABILITY = "io.quarkus.metrics";
-    private static final String MICROMETER_METRICS_CLASS = "io.quarkiverse.ssf.receiver.runtime.metrics.MicrometerSsfReceiverMetrics";
+
+    /** The optional integrations; named by string so that their classes are only loaded when wanted. */
+    private static final String OIDC_TOKEN_PROVIDERS_CLASS = "io.quarkiverse.ssf.receiver.runtime.auth.OidcClientTransmitterTokenProviders";
+    private static final String MICROMETER_METRICS_CLASS = "io.quarkiverse.ssf.receiver.runtime.metrics.MicrometerSsfReceiverMetricsProducer";
+    private static final String JDBC_STORE_PRODUCER_CLASS = "io.quarkiverse.ssf.receiver.runtime.jdbc.JdbcSsfJtiDedupStoreProducer";
+    private static final String HEALTH_CHECK_CLASS = "io.quarkiverse.ssf.receiver.runtime.health.SsfReceiverHealthCheck";
 
     @BuildStep
     FeatureBuildItem feature() {
@@ -57,20 +35,32 @@ class SsfReceiverProcessor {
     }
 
     /**
-     * The REST Client extension scans Jandex for interfaces it might be asked to build —
-     * classes living in a Quarkus extension's runtime artifact aren't part of the
-     * application archive by default, so the interface has to be indexed explicitly.
+     * easyssf's types in Jandex, so that application code can use them in bean and
+     * resource signatures (a JAX-RS resource returning an {@code SsfStreamConfiguration},
+     * say) and the extensions that act on the index see them.
      */
     @BuildStep
-    AdditionalIndexedClassesBuildItem indexRestClientInterfaces() {
-        return new AdditionalIndexedClassesBuildItem(
-                SsfTransmitterStreamStatusApi.class.getName(),
-                SsfTransmitterStreamConfigurationApi.class.getName(),
-                SsfTransmitterStreamVerificationApi.class.getName(),
-                SsfTransmitterStreamAddSubjectApi.class.getName(),
-                SsfTransmitterStreamRemoveSubjectApi.class.getName(),
-                SsfTransmitterPollApi.class.getName(),
-                SsfTransmitterMetadataApi.class.getName());
+    void indexEasyssf(io.quarkus.deployment.annotations.BuildProducer<IndexDependencyBuildItem> index) {
+        index.produce(new IndexDependencyBuildItem("org.easyssf", "easyssf-core"));
+        index.produce(new IndexDependencyBuildItem("org.easyssf", "easyssf-receiver"));
+        index.produce(new IndexDependencyBuildItem("org.easyssf", "easyssf-receiver-jdbc"));
+    }
+
+    /**
+     * The records applications are likely to serialize (an event token in a REST
+     * response, the stream configuration in a status page) are reflectively accessible
+     * in a native image.
+     */
+    @BuildStep
+    ReflectiveClassBuildItem reflectiveRecords() {
+        return ReflectiveClassBuildItem.builder(
+                "org.easyssf.core.event.SsfEventToken",
+                "org.easyssf.core.event.SsfSubject",
+                "org.easyssf.core.event.SsfSubjectIdentifier",
+                "org.easyssf.core.metadata.SsfTransmitterMetadata",
+                "org.easyssf.core.stream.SsfStreamConfiguration",
+                "org.easyssf.core.stream.SsfStreamStatus")
+                .methods().fields().build();
     }
 
     @BuildStep
@@ -78,124 +68,61 @@ class SsfReceiverProcessor {
         return AdditionalBeanBuildItem.builder()
                 .setUnremovable()
                 .addBeanClasses(
-                        JwksResolver.class,
-                        SetVerifier.class,
+                        SsfReceiverProducers.class,
+                        SsfReceiverLifecycle.class,
                         SsfPushRoute.class,
-                        SsfReceiverStartupValidator.class,
-                        LoggingSsfEventHandler.class,
-                        NoopTransmitterTokenProvider.class,
-                        SsfConfigurationResolver.class,
-                        SsfStreamClient.class,
-                        ReceiverManagedStreamState.class,
-                        ReceiverManagedStreamRegistrar.class,
-                        TransmitterManagedStreamProbe.class,
-                        InMemorySsfPollAckStore.class,
-                        SsfPoller.class,
-                        InMemorySsfJtiDedupStore.class,
-                        SsfAliases.class,
-                        NoopSsfReceiverMetrics.class)
+                        SsfPollScheduler.class,
+                        SsfReceiverStreamClient.class,
+                        LoggingSsfEventHandler.class)
                 .build();
     }
 
     /**
-     * Registers {@code MicrometerSsfReceiverMetrics} only when the consumer has
-     * {@code quarkus-micrometer} (or one of its registry extensions) on the
-     * classpath, signalled by the {@code io.quarkus.metrics} capability.
-     * Without that capability, {@link NoopSsfReceiverMetrics} stays in effect
-     * and {@code MicrometerSsfReceiverMetrics} is never loaded — which is
-     * essential, since it imports {@code io.micrometer.core.instrument.*}.
+     * Processed SETs are remembered in the default datasource when {@code quarkus-agroal}
+     * is present, in memory otherwise.
+     */
+    @BuildStep
+    AdditionalBeanBuildItem registerDedupStore(Capabilities capabilities) {
+        if (capabilities.isPresent(Capability.AGROAL)) {
+            LOG.debug("quarkus-agroal detected, processed SETs can be remembered in the default datasource");
+            return AdditionalBeanBuildItem.builder().setUnremovable().addBeanClass(JDBC_STORE_PRODUCER_CLASS).build();
+        }
+        return AdditionalBeanBuildItem.builder().setUnremovable().addBeanClass(InMemorySsfJtiDedupStoreProducer.class)
+                .build();
+    }
+
+    /**
+     * Micrometer metrics, when {@code quarkus-micrometer} (or one of its registry
+     * extensions) is present. The capability is {@code io.quarkus.metrics}, not
+     * micrometer, as SmallRye Metrics could provide it too.
      */
     @BuildStep
     AdditionalBeanBuildItem registerMicrometerMetrics(Capabilities capabilities) {
-        if (!capabilities.isPresent(MICROMETER_CAPABILITY)) {
+        if (!capabilities.isPresent(Capability.METRICS)) {
             return null;
         }
-        LOG.infof("io.quarkus.metrics capability present — registering MicrometerSsfReceiverMetrics");
-        return AdditionalBeanBuildItem.builder()
-                .setUnremovable()
-                .addBeanClass(MICROMETER_METRICS_CLASS)
-                .build();
+        LOG.debug("io.quarkus.metrics capability present, registering the Micrometer metrics of the SSF receiver");
+        return AdditionalBeanBuildItem.builder().setUnremovable().addBeanClass(MICROMETER_METRICS_CLASS).build();
     }
 
     /**
-     * Registers {@link StaticTransmitterTokenProvider} when {@code quarkus.openid-ssf.receiver.transmitter-access-token}
-     * is set in the consumer's config. Resolved at build time via {@code ConfigProvider}
-     * so the OIDC step (below) can decide whether to skip itself.
+     * Access tokens from {@code quarkus-oidc-client}, for transmitters without a static
+     * token or OAuth2 client credentials of their own.
      */
     @BuildStep
-    AdditionalBeanBuildItem registerStaticTokenProvider() {
-        if (!staticTokenConfigured()) {
+    AdditionalBeanBuildItem registerOidcTokenProviders(Capabilities capabilities) {
+        if (!capabilities.isPresent(Capability.OIDC_CLIENT)) {
             return null;
         }
-        LOG.infof("%s configured — registering StaticTransmitterTokenProvider", STATIC_TOKEN_PROPERTY);
-        return AdditionalBeanBuildItem.builder()
-                .setUnremovable()
-                .addBeanClass(StaticTransmitterTokenProvider.class)
-                .build();
+        LOG.debug("quarkus-oidc-client detected, its clients can authenticate calls to the SSF transmitters");
+        return AdditionalBeanBuildItem.builder().setUnremovable().addBeanClass(OIDC_TOKEN_PROVIDERS_CLASS).build();
     }
 
-    /**
-     * Registers {@code Oauth2TransmitterTokenProvider} when
-     * {@link #OAUTH2_TOKEN_ENDPOINT_PROPERTY} is set and a static token isn't.
-     * Self-contained client_credentials grant — runs without
-     * {@code quarkus-oidc-client}, takes precedence over it when both could
-     * apply. Consumers who want OIDC simply leave this property unset.
-     */
     @BuildStep
-    AdditionalBeanBuildItem registerOauth2TokenProvider() {
-        if (staticTokenConfigured()) {
+    AdditionalBeanBuildItem registerHealthCheck(Capabilities capabilities) {
+        if (!capabilities.isPresent(Capability.SMALLRYE_HEALTH)) {
             return null;
         }
-        if (!oauth2TokenEndpointConfigured()) {
-            return null;
-        }
-        LOG.infof("%s configured — registering Oauth2TransmitterTokenProvider",
-                OAUTH2_TOKEN_ENDPOINT_PROPERTY);
-        return AdditionalBeanBuildItem.builder()
-                .setUnremovable()
-                .addBeanClass(io.quarkiverse.ssf.receiver.runtime.auth.Oauth2TransmitterTokenProvider.class)
-                .build();
-    }
-
-    /**
-     * Registers the OIDC-backed {@code TransmitterTokenProvider} only when the consumer
-     * has {@code quarkus-oidc-client} on the classpath <em>and</em> hasn't pinned a
-     * static {@code transmitter-access-token} or configured {@link #OAUTH2_TOKEN_ENDPOINT_PROPERTY}.
-     * Without any of those, the default no-op provider stays in effect and outbound
-     * calls go unauthenticated.
-     */
-    @BuildStep
-    AdditionalBeanBuildItem registerOidcTokenProvider(Capabilities capabilities) {
-        if (!capabilities.isPresent(OIDC_CLIENT_CAPABILITY)) {
-            return null;
-        }
-        if (staticTokenConfigured()) {
-            LOG.infof("%s is set — skipping OidcTransmitterTokenProvider", STATIC_TOKEN_PROPERTY);
-            return null;
-        }
-        if (oauth2TokenEndpointConfigured()) {
-            LOG.infof("%s is set — skipping OidcTransmitterTokenProvider",
-                    OAUTH2_TOKEN_ENDPOINT_PROPERTY);
-            return null;
-        }
-        LOG.infof("quarkus-oidc-client detected — registering OidcTransmitterTokenProvider");
-        return AdditionalBeanBuildItem.builder()
-                .setUnremovable()
-                .addBeanClass(OIDC_TOKEN_PROVIDER_CLASS)
-                .build();
-    }
-
-    private static boolean staticTokenConfigured() {
-        return ConfigProvider.getConfig()
-                .getOptionalValue(STATIC_TOKEN_PROPERTY, String.class)
-                .filter(s -> !s.isBlank())
-                .isPresent();
-    }
-
-    private static boolean oauth2TokenEndpointConfigured() {
-        return ConfigProvider.getConfig()
-                .getOptionalValue(OAUTH2_TOKEN_ENDPOINT_PROPERTY, String.class)
-                .filter(s -> !s.isBlank())
-                .isPresent();
+        return AdditionalBeanBuildItem.builder().setUnremovable().addBeanClass(HEALTH_CHECK_CLASS).build();
     }
 }

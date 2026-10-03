@@ -12,7 +12,6 @@
                 <entry key="OIDC_ISSUER_URL" value="https://oidc.issuer.test" />
                 <entry key="SSF_RECEIVER_CLIENT_ID" value="client_id" />
                 <entry key="SSF_RECEIVER_CLIENT_SECRET" value="client_secret" />
-                <entry key="SSF_RECEIVER_ISSUER_ALIASES_KEYCLOAKSSFPOC" value="https://transmitter.issuer.test" />
                 <entry key="SSF_RECEIVER_TRANSMITTER_ISSUER" value="https://transmitter.issuer.test" />
               </map>
             </option>

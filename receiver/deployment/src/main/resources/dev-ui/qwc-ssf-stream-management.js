@@ -215,8 +215,10 @@ export class QwcSsfStreamManagement extends LitElement {
                     <div class="value">${s.streamId ?? '—'}</div>
                 </div>
                 <div class="field">
-                    <div class="field-label">Transmitter issuer</div>
-                    <div class="value">${s.transmitterIssuer ?? '—'}</div>
+                    <div class="field-label">Transmitter</div>
+                    <div class="value"><strong>${s.transmitterName ?? '—'}</strong>
+                        <div style="font-size:var(--lumo-font-size-xs);color:var(--lumo-secondary-text-color);word-break:break-all">${s.transmitterIssuer ?? '—'}</div>
+                    </div>
                 </div>
             </div>
             <div class="row">
@@ -265,6 +267,7 @@ export class QwcSsfStreamManagement extends LitElement {
         </ul>`;
     }
 
+    /** The issuer with the name of the transmitter it belongs to, when the receiver has it configured. */
     _issuerWithAlias(issuer) {
         if (!issuer) return '—';
         const alias = (this._aliases && this._aliases.issuerAliases) ? this._aliases.issuerAliases[issuer] : null;
@@ -278,14 +281,6 @@ export class QwcSsfStreamManagement extends LitElement {
         if (!this._config) return html`<div>Loading current configuration…</div>`;
         const c = this._config;
         return html`
-            ${this._aliases && this._aliases.receiverAlias ? html`
-                <div class="row">
-                    <div class="field">
-                        <div class="field-label">receiver alias (quarkus.openid-ssf.receiver.alias)</div>
-                        <div class="value"><code>${this._aliases.receiverAlias}</code></div>
-                    </div>
-                </div>
-            ` : ''}
             ${c.description ? html`
                 <div class="row">
                     <div class="field">
@@ -463,9 +458,9 @@ export class QwcSsfStreamManagement extends LitElement {
                 border-radius: var(--lumo-border-radius-m);
                 margin-top: 0.75rem;
             ">
-                <div style="font-weight:600;margin-bottom:0.25rem">Stream registration in progress…</div>
+                <div style="font-weight:600;margin-bottom:0.25rem">No stream to manage yet</div>
                 <div style="color:var(--lumo-secondary-text-color);font-size:var(--lumo-font-size-s)">
-                    ${(r && r.message) || 'Waiting for the receiver-managed registrar to discover or create the stream on the transmitter.'}
+                    ${(r && r.message) || 'Waiting for the stream registrar to look up or create the stream at the transmitter.'}
                 </div>
             </div>
             <div class="actions" style="margin-top:0.75rem">
@@ -514,8 +509,8 @@ export class QwcSsfStreamManagement extends LitElement {
             <h3 style="margin-top:1.25rem">Verify</h3>
             <div>
                 Trigger a Verification Event with a freshly-generated <code>state</code>.
-                The transmitter echoes it back in the resulting Verification SET that
-                arrives at the push endpoint.
+                The transmitter echoes it back in the resulting Verification SET, which
+                the receiver validates against the state it sent.
             </div>
             <div class="actions">
                 <vaadin-button theme="primary" ?disabled=${this._busy}

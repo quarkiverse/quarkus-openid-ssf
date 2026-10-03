@@ -36,14 +36,11 @@
         <maven.compiler.release>21</maven.compiler.release>
 
         <quarkus.version>3.35.2</quarkus.version>
+        <!-- The protocol implementation shared with the Spring Boot starter. -->
+        <easyssf.version>0.0.1-SNAPSHOT</easyssf.version>
         <sundrio.version>0.300.0</sundrio.version>
-        <wiremock.version>3.9.1</wiremock.version>
 
-        <!--
-            Surefire's @{argLine} placeholder for plugin chaining (Jacoco etc).
-            Default to empty so receiver/runtime/pom.xml's javaagent argLine
-            substitution resolves cleanly when no other plugin sets it.
-        -->
+        <!-- Surefire's @{argLine} placeholder for plugin chaining (Jacoco etc). -->
         <argLine />
     </properties>
 
@@ -55,11 +52,6 @@
                 <version>${quarkus.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.wiremock</groupId>
-                <artifactId>wiremock</artifactId>
-                <version>${wiremock.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

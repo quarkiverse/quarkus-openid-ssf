@@ -1,167 +1,70 @@
 package io.quarkiverse.ssf.receiver.deployment;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
-import static com.github.tomakehurst.wiremock.client.WireMock.get;
-import static com.github.tomakehurst.wiremock.client.WireMock.post;
-import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
-import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
-import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
 
 import jakarta.inject.Inject;
 
-import org.jboss.shrinkwrap.api.ShrinkWrap;
-import org.jboss.shrinkwrap.api.spec.JavaArchive;
+import org.awaitility.Awaitility;
+import org.easyssf.receiver.stream.SsfStreamRegistrar;
+import org.easyssf.receiver.transmitter.SsfTransmitter;
+import org.easyssf.receiver.transmitter.SsfTransmitters;
+import org.easyssf.test.TestTransmitter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.tomakehurst.wiremock.client.WireMock;
-
-import io.quarkiverse.ssf.receiver.runtime.stream.ReceiverManagedStreamState;
+import io.quarkiverse.ssf.receiver.runtime.stream.SsfReceiverStreamClient;
 import io.quarkus.test.QuarkusExtensionTest;
 
 /**
- * Layer-2 test: the receiver-managed registrar's exponential-backoff retry
- * loop. A flaky transmitter that 500s on the first POST should not stop the
- * receiver from coming up — the registrar must retry on its virtual thread
- * and eventually publish the assigned stream_id to
- * {@link ReceiverManagedStreamState}.
- *
- * <p>
- * Drives the failure transition via a WireMock scenario: the first POST is
- * stubbed to return 500 and advances the scenario; the second POST runs from
- * a different scenario state and returns 201 with the assigned stream_id.
- *
- * <p>
- * Registrar's hard-coded initial backoff is 1s — the test budgets 8s for
- * the second attempt to land (worst case is 1s sleep + a slow CI runner).
+ * A transmitter that is down while the application starts does not keep it from
+ * starting: the registrar retries in the background until the stream is registered.
  */
 public class RegistrarRetryTest {
 
-    private static final String ISSUER = "https://test.transmitter/realms/r1";
-    private static final String AUDIENCE = "https://my-receiver.example/ssf";
-    private static final String DELIVERY_URL = "https://my-receiver.example/ssf/push";
-    private static final String EVENT_TYPE = JwksWireMock.EVENT_TYPE;
-    private static final String CREATED_STREAM_ID = "created-after-retry-001";
-    private static final String SCENARIO = "registrar-create-retry";
-    private static final String STATE_AFTER_FAILURE = "create-failed-once";
-
     @RegisterExtension
     static final QuarkusExtensionTest TEST = new QuarkusExtensionTest()
-            .setArchiveProducer(() -> ShrinkWrap.create(JavaArchive.class)
-                    .addClasses(JwksWireMock.class))
-            .setBeforeAllCustomizer(() -> {
-                JwksWireMock.start(ISSUER, AUDIENCE);
-
-                // GET list → empty (so the registrar always falls through to create).
-                JwksWireMock.server().stubFor(get(urlPathEqualTo("/streams/configuration"))
-                        .atPriority(5)
-                        .willReturn(aResponse()
-                                .withStatus(200)
-                                .withHeader("Content-Type", "application/json")
-                                .withBody("[]")));
-
-                // First POST → 500, advance scenario.
-                JwksWireMock.server().stubFor(post(urlEqualTo("/streams/configuration"))
-                        .inScenario(SCENARIO)
-                        .whenScenarioStateIs(STARTED)
-                        .willSetStateTo(STATE_AFTER_FAILURE)
-                        .willReturn(aResponse()
-                                .withStatus(500)
-                                .withHeader("Content-Type", "application/json")
-                                .withBody("{\"error\":\"simulated transient outage\"}")));
-
-                // Second POST → 201 with the assigned stream_id.
-                Map<String, Object> created = new LinkedHashMap<>();
-                created.put("stream_id", CREATED_STREAM_ID);
-                created.put("iss", ISSUER);
-                created.put("aud", List.of(AUDIENCE));
-                created.put("events_supported", List.of(EVENT_TYPE));
-                created.put("events_requested", List.of(EVENT_TYPE));
-                created.put("events_delivered", List.of(EVENT_TYPE));
-                Map<String, Object> delivery = new LinkedHashMap<>();
-                delivery.put("method", "urn:ietf:rfc:8935");
-                delivery.put("endpoint_url", DELIVERY_URL);
-                created.put("delivery", delivery);
-                String createdJson;
-                try {
-                    createdJson = new ObjectMapper().writeValueAsString(created);
-                } catch (Exception e) {
-                    throw new IllegalStateException(e);
-                }
-                JwksWireMock.server().stubFor(post(urlEqualTo("/streams/configuration"))
-                        .inScenario(SCENARIO)
-                        .whenScenarioStateIs(STATE_AFTER_FAILURE)
-                        .willReturn(aResponse()
-                                .withStatus(201)
-                                .withHeader("Content-Type", "application/json")
-                                .withBody(createdJson)));
-
-                // Status for the eventually-created stream (used by the registrar's log line).
-                Map<String, Object> statusBody = new LinkedHashMap<>();
-                statusBody.put("stream_id", CREATED_STREAM_ID);
-                statusBody.put("status", "enabled");
-                String statusJson;
-                try {
-                    statusJson = new ObjectMapper().writeValueAsString(statusBody);
-                } catch (Exception e) {
-                    throw new IllegalStateException(e);
-                }
-                JwksWireMock.server().stubFor(
-                        get(urlEqualTo("/streams/status?stream_id=" + CREATED_STREAM_ID))
-                                .willReturn(aResponse()
-                                        .withStatus(200)
-                                        .withHeader("Content-Type", "application/json")
-                                        .withBody(statusJson)));
-            })
-            .setAfterAllCustomizer(JwksWireMock::stop)
-            .overrideConfigKey("quarkus.openid-ssf.receiver.transmitter-issuer", ISSUER)
-            .overrideConfigKey("quarkus.openid-ssf.receiver.expected-audience", AUDIENCE)
+            .setArchiveProducer(() -> TestTransmitters.archive())
+            .setBeforeAllCustomizer(() -> TestTransmitters.start().setAvailable(false))
+            .setAfterAllCustomizer(TestTransmitters::stop)
+            .overrideConfigKey("quarkus.openid-ssf.receiver.transmitter-issuer",
+                    TestTransmitters.ref(TestTransmitters.issuerProperty(TestTransmitters.DEFAULT)))
             .overrideConfigKey("quarkus.openid-ssf.receiver.stream-management", "RECEIVER")
-            .overrideConfigKey("quarkus.openid-ssf.receiver.delivery-method", "PUSH")
-            .overrideConfigKey("quarkus.openid-ssf.receiver.push.delivery-endpoint-url", DELIVERY_URL)
-            .overrideConfigKey("quarkus.openid-ssf.receiver.events-requested", EVENT_TYPE)
-            .overrideConfigKey("quarkus.openid-ssf.receiver.receiver-managed.delete-on-shutdown", "false");
+            .overrideConfigKey("quarkus.openid-ssf.receiver.delivery-method", "POLL")
+            .overrideConfigKey("quarkus.openid-ssf.receiver.poll.auto-start", "false")
+            .overrideConfigKey("quarkus.openid-ssf.receiver.events-requested", "CaepSessionRevoked")
+            .overrideConfigKey("quarkus.openid-ssf.receiver.transmitter-access-token", TestTransmitter.ACCESS_TOKEN);
 
     @Inject
-    ReceiverManagedStreamState state;
+    SsfTransmitters transmitters;
+
+    @Inject
+    SsfReceiverStreamClient streamClient;
 
     @Test
-    @DisplayName("First create 500s → registrar retries → eventually publishes the stream_id")
-    void registrarRetriesAfterTransientFailure() throws Exception {
-        Optional<String> sid = waitForStreamId(state, 8, TimeUnit.SECONDS);
-        assertTrue(sid.isPresent(),
-                "registrar should publish a stream_id after retrying the create");
-        assertEquals(CREATED_STREAM_ID, sid.get());
+    @DisplayName("Transmitter down at startup -> registering with retries, registered once it is back")
+    void registrarRetriesUntilTheTransmitterIsBack() {
+        SsfTransmitter transmitter = transmitters.primary().orElseThrow();
+        SsfStreamRegistrar registrar = transmitter.getStreamRegistrar();
 
-        // Exactly two POSTs were made: the failing one and the successful one.
-        // No third call (the registrar must STOP retrying once it succeeds).
-        int port = Integer.parseInt(System.getProperty(JwksWireMock.PROP_WIREMOCK_PORT));
-        WireMock wm = new WireMock("localhost", port);
-        int posts = wm.find(postRequestedFor(urlEqualTo("/streams/configuration"))).size();
-        assertEquals(2, posts, "expected exactly one failing + one successful POST");
-    }
+        Awaitility.await().atMost(Duration.ofSeconds(5))
+                .until(() -> registrar.getState() == SsfStreamRegistrar.State.REGISTERING
+                        && registrar.getLastError() != null);
+        assertThat(registrar.getLastError(), notNullValue());
+        assertEquals(0, TestTransmitters.current().streams().size());
 
-    private static Optional<String> waitForStreamId(ReceiverManagedStreamState state,
-            long timeout, TimeUnit unit) throws InterruptedException {
-        long deadline = System.nanoTime() + unit.toNanos(timeout);
-        while (System.nanoTime() < deadline) {
-            Optional<String> sid = state.streamId();
-            if (sid.isPresent()) {
-                return sid;
-            }
-            Thread.sleep(50L);
-        }
-        return state.streamId();
+        TestTransmitters.current().setAvailable(true);
+        TestTransmitters.awaitRegistered(transmitter);
+
+        assertEquals(1, TestTransmitters.current().streams().size());
+        assertThat(streamClient.streamId(), equalTo(TestTransmitters.current().streams().get(0).get("stream_id")));
+        // the poll endpoint of the created stream is known now
+        assertThat(streamClient.stream().orElseThrow().deliveryEndpointUrl().toString(),
+                equalTo(TestTransmitters.current().pollUri()));
     }
 }

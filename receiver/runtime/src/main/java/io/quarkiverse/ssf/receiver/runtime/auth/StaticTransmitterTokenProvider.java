@@ -1,32 +1,31 @@
 package io.quarkiverse.ssf.receiver.runtime.auth;
 
-import java.util.Optional;
-
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-
-import io.quarkiverse.ssf.receiver.runtime.SsfReceiverConfig;
+import org.easyssf.receiver.transmitter.SsfTransmitterTokenProvider;
 
 /**
- * Returns a fixed bearer token configured via
- * {@code quarkus.openid-ssf.receiver.transmitter-access-token}. Registered by
- * {@code SsfReceiverProcessor} only when that property is set; in that case it
- * also displaces {@link OidcTransmitterTokenProvider} so there's no CDI
- * ambiguity over which provider supplies the outbound token.
- *
- * <p>
- * Intended for transmitters that issue long-lived bearer tokens out-of-band
- * (e.g. <a href="https://ssf.caep.dev">caep.dev</a>) rather than expecting an
- * OAuth grant.
+ * Sends a fixed bearer token, configured with
+ * {@code quarkus.openid-ssf.receiver.transmitter-access-token}, on every call to the
+ * transmitter. For transmitters that issue long-lived tokens out-of-band, such as
+ * <a href="https://ssf.caep.dev">caep.dev</a>.
  */
-@ApplicationScoped
-public class StaticTransmitterTokenProvider implements TransmitterTokenProvider {
+public final class StaticTransmitterTokenProvider implements SsfTransmitterTokenProvider {
 
-    @Inject
-    SsfReceiverConfig config;
+    private final String accessToken;
+
+    public StaticTransmitterTokenProvider(String accessToken) {
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new IllegalArgumentException("accessToken must not be empty");
+        }
+        this.accessToken = accessToken;
+    }
 
     @Override
-    public Optional<String> accessToken() {
-        return config.transmitterAccessToken().filter(t -> !t.isBlank());
+    public String getAccessToken() {
+        return accessToken;
+    }
+
+    @Override
+    public String toString() {
+        return "StaticTransmitterTokenProvider";
     }
 }

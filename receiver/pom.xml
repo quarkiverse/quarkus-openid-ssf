@@ -19,5 +19,7 @@
         <module>deployment</module>
         <module>examples/example-transmitter-managed-stream</module>
         <module>examples/example-receiver-managed-stream</module>
+        <module>examples/example-resource-server</module>
+        <module>examples/example-oidc-client</module>
     </modules>
 </project>

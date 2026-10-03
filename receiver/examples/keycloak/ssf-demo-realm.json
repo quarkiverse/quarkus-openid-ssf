@@ -1,0 +1,151 @@
+{
+  "realm": "ssf-demo",
+  "enabled": true,
+  "attributes": {
+    "ssf.transmitterEnabled": "true"
+  },
+  "users": [
+    {
+      "username": "tester",
+      "enabled": true,
+      "email": "tester@example.com",
+      "emailVerified": true,
+      "realmRoles": [
+        "default-roles-ssf-demo"
+      ],
+      "firstName": "Theo",
+      "lastName": "Tester",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "test",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "bob",
+      "enabled": true,
+      "email": "bob@example.com",
+      "emailVerified": true,
+      "realmRoles": [
+        "default-roles-ssf-demo"
+      ],
+      "firstName": "Bob",
+      "lastName": "Demo",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "bob",
+          "temporary": false
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "example-oidc-client",
+      "name": "Example OIDC client",
+      "description": "The example-oidc-client application: logs users in and is an SSF receiver. It registers its own PUSH stream with its service account. Neither back-channel nor front-channel logout is configured.",
+      "enabled": true,
+      "fullScopeAllowed": false,
+      "publicClient": false,
+      "secret": "example-oidc-client-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "defaultClientScopes": [
+        "basic",
+        "profile",
+        "email",
+        "roles",
+        "web-origins",
+        "acr"
+      ],
+      "optionalClientScopes": [
+        "ssf.read",
+        "ssf.manage"
+      ],
+      "frontchannelLogout": false,
+      "rootUrl": "http://localhost:8082",
+      "baseUrl": "/",
+      "redirectUris": [
+        "http://localhost:8082/*"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:8082/*",
+        "ssf.enabled": "true",
+        "ssf.defaultSubjects": "ALL",
+        "ssf.validPushUrls": "http://host.docker.internal:8082/ssf/push"
+      }
+    },
+    {
+      "clientId": "example-resource-server",
+      "name": "Example resource server",
+      "description": "The example-resource-server application: an SSF receiver that registers its own PUSH stream with its service account, it does not log users in itself",
+      "enabled": true,
+      "fullScopeAllowed": false,
+      "publicClient": false,
+      "secret": "example-resource-server-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "defaultClientScopes": [
+        "basic",
+        "profile",
+        "email",
+        "roles",
+        "web-origins",
+        "acr"
+      ],
+      "optionalClientScopes": [
+        "ssf.read",
+        "ssf.manage"
+      ],
+      "attributes": {
+        "ssf.enabled": "true",
+        "ssf.defaultSubjects": "ALL",
+        "ssf.validPushUrls": "http://host.docker.internal:8081/ssf/push"
+      }
+    },
+    {
+      "clientId": "example-poll-receiver",
+      "name": "Example resource server (poll profile)",
+      "description": "The example-resource-server application started with the 'poll' profile: it authenticates with its service account, registers its own stream and polls it",
+      "enabled": true,
+      "fullScopeAllowed": false,
+      "publicClient": false,
+      "secret": "example-poll-receiver-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "defaultClientScopes": [
+        "basic",
+        "profile",
+        "email",
+        "roles",
+        "web-origins",
+        "acr"
+      ],
+      "optionalClientScopes": [
+        "ssf.read",
+        "ssf.manage"
+      ],
+      "attributes": {
+        "ssf.enabled": "true",
+        "ssf.defaultSubjects": "ALL"
+      }
+    },
+    {
+      "clientId": "example-cli",
+      "name": "Example command line client",
+      "description": "Public client to obtain access tokens for the example-resource-server with curl",
+      "enabled": true,
+      "fullScopeAllowed": false,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false
+    }
+  ]
+}

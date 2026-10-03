@@ -25,42 +25,39 @@ neutral on purpose so it stays a useful template.
 
 ## What it demonstrates
 
-- **Discover-or-create** lifecycle in `ReceiverManagedStreamRegistrar`:
-    1. `GET <configuration_endpoint>` (no `stream_id`) lists streams this
-       receiver already owns on the transmitter.
-    2. If a stream's `delivery.endpoint_url` matches our configured push URL
-       — or its `aud` contains `expected-audience` — its `stream_id` is
-       **reused**.
+- **Receiver-managed stream** (the stream registrar of easyssf, on startup):
+    1. `GET <configuration_endpoint>` (no `stream_id`) lists the streams this
+       receiver already owns at the transmitter.
+    2. A stream with the configured delivery (the push URL, or POLL) is
+       **reused**, and **updated** if its requested events differ.
     3. Otherwise a new stream is **created** with the configured
        `delivery.endpoint_url`, `events_requested`, and optional `description`.
-- **Build-time auth selection**: the deployment processor picks
-  `StaticTransmitterTokenProvider` when `transmitter-access-token` is set
-  (`caepdev` profile, or whenever you set `SSF_RECEIVER_TRANSMITTER_ACCESS_TOKEN`
-  in the default profile) and `OidcTransmitterTokenProvider` when it isn't and
-  `quarkus-oidc-client` is on the classpath (`keycloak` profile).
+- **Runtime auth selection**: a static token when `transmitter-access-token`
+  is set (`caepdev` profile, or whenever you set
+  `SSF_RECEIVER_TRANSMITTER_ACCESS_TOKEN` in the default profile), else
+  `oauth2.token-endpoint`, else the OIDC client of `quarkus-oidc-client`
+  (`keycloak` profile).
 - **Both delivery modes**: PUSH in the default and `caepdev` profiles, POLL
-  (RFC 8936) in the `keycloak` profile with a periodic Vert.x timer + ack queue.
-- **Manual poll trigger** (`POST /streams/default/poll`) — useful for demos
-  and works only in POLL mode.
-- **`CapturedEvent` wrapper** — each captured `SsfEventToken` is exposed via
-  REST with the per-event-type **payload** keyed by alias, plus the raw token
-  for inspection.
-- **Aliases** (`SsfAliases`) — short, readable names for event-type URIs and
-  issuer URLs in logs and metric tags.
+  (RFC 8936) in the `keycloak` profile with a periodic Vert.x timer.
+- **Manual poll trigger** (`POST /streams/default/poll`, `SsfPollScheduler.pollNow()`),
+  useful for demos and works only in POLL mode.
+- **`CapturedEvent` wrapper**: each captured `SsfEventToken` is exposed via
+  REST with the per-event-type **payload** keyed by the alias of the event
+  type, plus the raw token for inspection.
 
 ### Endpoints (port `28080`)
 
 | | |
 |---|---|
-| `GET  /events/recent-events` | Last 50 captures (alias-keyed `payloads` + raw token) |
+| `GET  /events/recent-events` | Last 50 captures (alias-keyed `events` + raw token) |
 | `GET  /events/latest`        | Most recent capture |
-| `GET  /transmitter/registration` | The `stream_id` the registrar discovered or created |
+| `GET  /transmitter/registration` | The `stream_id` the registrar discovered or created, and the state of the registration |
 | `GET  /transmitter/metadata` | Parsed `.well-known/ssf-configuration` |
 | `GET  /streams`              | All streams this receiver owns on the transmitter |
 | `GET  /streams/default`      | Live config for our auto-registered stream |
 | `GET  /streams/default/status` | Live status |
 | `POST /streams/default/status?status=paused&reason=…` | Pause / enable / disable |
-| `POST /streams/default/verify[?state=…]` | Trigger a Verification SET |
+| `POST /streams/default/verify` | Trigger a Verification SET; the extension validates the echoed state |
 | `POST /streams/default/poll` | Run one POLL cycle now (POLL mode only — 409 in PUSH mode) |
 | `DELETE /streams/default`    | Delete the stream on the transmitter |
 | `GET  /q/metrics`            | Prometheus scrape endpoint (Micrometer) |
@@ -76,9 +73,9 @@ env vars below and `mvn quarkus:dev` works against any SSF-compliant transmitter
 | Variable | Required? | Purpose |
 |---|---|---|
 | `SSF_RECEIVER_TRANSMITTER_ISSUER` | yes | The transmitter's issuer URL — drives `.well-known/ssf-configuration` discovery and JWKS fetch. |
-| `SSF_RECEIVER_TRANSMITTER_ACCESS_TOKEN` | optional | Long-lived bearer token. If set, build-time selects `StaticTransmitterTokenProvider`; if unset, OIDC is used (assumes `quarkus.oidc-client.*` is configured via a profile). |
+| `SSF_RECEIVER_TRANSMITTER_ACCESS_TOKEN` | optional | Long-lived bearer token. If set, it authenticates every call to the transmitter; if unset, the OIDC client is used (assumes `quarkus.oidc-client.*` is configured via a profile). |
 | `SSF_RECEIVER_PUSH_DELIVERY_URL` | optional | Public URL the transmitter should POST SETs to. Defaults to `http://localhost:28081/ssf/push`; override with your tunnel URL for caep.dev / public transmitters. |
-| `SSF_RECEIVER_EXPECTED_AUDIENCE` | optional | The `aud` claim this receiver expects on inbound SETs. Defaults to the placeholder `https://my.expected.audience.com`. |
+| `SSF_RECEIVER_EXPECTED_AUDIENCE` | optional | The `aud` claim this receiver expects on inbound SETs. Defaults to the placeholder `https://my.expected.audience.com`; leave `expected-audience` unset to accept the audience the transmitter assigned to the stream. |
 
 ### `caepdev` profile — caep.dev / PUSH
 
@@ -119,15 +116,14 @@ mvn -pl examples/example-receiver-managed-stream quarkus:dev -Dquarkus.profile=c
 Expected boot log on first run:
 
 ```
-INFO  quarkus.openid-ssf.receiver.transmitter-access-token configured — registering StaticTransmitterTokenProvider
-INFO  Receiver-managed mode: no existing stream matched (delivery-method=PUSH) — creating a new one
-INFO  Receiver-managed mode: created stream stream_id=… (status=enabled, delivery-method=PUSH, push_endpoint=…, events_delivered=[CaepSessionRevoked, CaepCredentialChange])
+INFO  SSF transmitter https://ssf.caep.dev: calls are authenticated with StaticTransmitterTokenProvider
+INFO  Created SSF stream … (delivery urn:ietf:rfc:8935 https://…/ssf/push, events [CaepSessionRevoked, CaepCredentialChange, …], audience [...])
 ```
 
-On subsequent runs the discover step finds and reuses the stream:
+On subsequent runs the registrar finds and reuses the stream:
 
 ```
-INFO  Receiver-managed mode: reusing existing stream stream_id=… (status=enabled, …)
+INFO  Using existing SSF stream … (delivery urn:ietf:rfc:8935 …)
 ```
 
 #### 4. Confirm
@@ -170,10 +166,9 @@ config — no `push.delivery-endpoint-url` to set.
 Expected boot log on first run:
 
 ```
-INFO  quarkus.openid-ssf.receiver.transmitter-access-token configured — registering StaticTransmitterTokenProvider
-INFO  Receiver-managed mode: no existing stream matched (delivery-method=POLL) — creating a new one
-INFO  Receiver-managed mode: created stream stream_id=… (status=enabled, delivery-method=POLL, poll_endpoint=https://ssf.caep.dev/…, events_delivered=[CaepSessionRevoked, CaepCredentialChange])
-INFO  POLL delivery: scheduling poll of https://ssf.caep.dev/… every 5000ms (start-delay=0ms, max-events=100, return-immediately=true)
+INFO  SSF transmitter https://ssf.caep.dev: calls are authenticated with StaticTransmitterTokenProvider
+INFO  SSF transmitter https://ssf.caep.dev: polling every 5s (start delay 2s, max 50 SETs per request)
+INFO  Created SSF stream … (delivery urn:ietf:rfc:8936 https://ssf.caep.dev/…, events [CaepSessionRevoked, CaepCredentialChange, …], audience [...])
 ```
 
 #### 3. Trigger and confirm
@@ -187,11 +182,9 @@ curl -s -X POST localhost:28080/streams/default/poll   # force one cycle now ins
 curl -s localhost:28080/events/recent-events   | jq    # see what arrived
 ```
 
-> **Production cadence.** `poll.interval=5s` is for the demo. A sensible
-> production setup is either `return-immediately=false` (long-poll, the
-> transmitter holds the request open until events show up — lowest latency
-> with the fewest requests) or a longer interval like `30s` if your
-> transmitter doesn't support long-poll.
+> **Production cadence.** `poll.interval=5s` is for the demo; the default is
+> `30s`. A poll fetches again while the transmitter reports `moreAvailable`,
+> so a burst of events does not wait for the next interval.
 
 ### `keycloak` profile — Keycloak / POLL
 
@@ -200,24 +193,21 @@ export OIDC_ISSUER_URL=https://your-kc/realms/ssf-poc
 export SSF_RECEIVER_CLIENT_ID=quarkus-openid-ssf-receiver
 export SSF_RECEIVER_CLIENT_SECRET=<oidc-client-secret>
 export SSF_RECEIVER_TRANSMITTER_ISSUER=https://your-kc/realms/ssf-poc
-export SSF_RECEIVER_ISSUER_ALIASES_KEYCLOAKSSFPOC=https://your-kc/realms/ssf-poc
 
 mvn -pl examples/example-receiver-managed-stream quarkus:dev -Dquarkus.profile=keycloak
 ```
 
 Profile-specific overrides live in [`application-keycloak.properties`](src/main/resources/application-keycloak.properties).
 Notable differences from default:
-- `transmitter-access-token=` (empty, defensive override) → forces OIDC selection
-  at build time even if `SSF_RECEIVER_TRANSMITTER_ACCESS_TOKEN` is set globally.
+- `transmitter-access-token=` (empty, defensive override) → the OIDC client is
+  used even if `SSF_RECEIVER_TRANSMITTER_ACCESS_TOKEN` is set globally.
 - `delivery-method=POLL` + `poll.*` settings — no tunnel needed; the receiver
   pulls from the transmitter.
 - Outbound auth: the file ships with `quarkus.oidc-client.*` **active** (so
-  the OIDC-backed `TransmitterTokenProvider` is selected by default) and the
-  alternative `quarkus.openid-ssf.receiver.oauth2.*` block commented out as a reference for
-  the self-contained `Oauth2TransmitterTokenProvider`. To switch, comment
-  the OIDC block and uncomment the Oauth2 one — both read the same
-  `SSF_RECEIVER_CLIENT_ID` / `SSF_RECEIVER_CLIENT_SECRET` / `OIDC_ISSUER_URL`
-  env vars.
+  the OIDC client authenticates the calls to Keycloak). The self-contained
+  alternative is `quarkus.openid-ssf.receiver.oauth2.token-endpoint` /
+  `client-id` / `client-secret`, which takes precedence when set, see the
+  resource server example.
 
 Manual POLL trigger (works alongside the periodic timer):
 
@@ -225,11 +215,6 @@ Manual POLL trigger (works alongside the periodic timer):
 curl -s -X POST localhost:28080/streams/default/poll
 # → {"result":"ok"}  + recent-events updates with whatever was waiting
 ```
-
-> **Build-time vs runtime:** the Static-vs-OIDC `TransmitterTokenProvider`
-> decision is made at build time. Dev mode rebuilds on profile change so this
-> is seamless; for a packaged jar, repackage with the desired profile
-> (`mvn package -Dquarkus.profile=keycloak`).
 
 ### Adding a new transmitter
 
@@ -258,15 +243,15 @@ Edge cases worth knowing:
 scrapable at `/q/metrics`:
 
 ```sh
-curl -s localhost:28080/q/metrics | grep ^ssf_receiver_
+curl -s localhost:28080/q/metrics | grep ^easyssf_receiver_
 ```
 
-Sample series with the example's configured aliases:
+Sample series:
 
 ```
-ssf_receiver_events_processed_total{event="CaepSessionRevoked",iss="CaepDev",receiver="quarkus-openid-ssf-receiver",delivery="push"} 7.0
-ssf_receiver_poll_cycles_seconds_count{outcome="success"} 24.0
-ssf_receiver_poll_ack_queue_depth 0.0
+easyssf_receiver_sets_total{delivery="push",outcome="handled",transmitter="default"} 7.0
+easyssf_receiver_events_total{delivery="push",event="CaepSessionRevoked",transmitter="default"} 7.0
+easyssf_receiver_poll_seconds_count{outcome="success",transmitter="default"} 24.0
 ```
 
 ## Disable
@@ -278,14 +263,13 @@ a different REST resource locally):
 mvn -pl examples/example-receiver-managed-stream quarkus:dev -Dquarkus.openid-ssf.receiver.enabled=false
 ```
 
-The CDI beans stay wired (so app code that touches `SsfStreamClient` directly
-still works), but no startup probe / registrar / poller runs.
+The CDI beans stay wired, but no stream is registered and nothing is polled.
 
 ## What this example does *not* demonstrate
 
-- Persistence — events are in-memory only; the stream id is re-discovered on
-  every restart. A real receiver would back `SsfPollAckStore` with durable
-  storage and provide its own `SsfJtiDedupStore` instead of the default
-  in-memory one.
-- Per-event-type CAEP / RISC payload parsing — `CapturedEvent.payloads()`
+- Persistence: events are in-memory only; the stream is re-discovered on
+  every restart. A real receiver keeps processed SETs in its database
+  (`quarkus-agroal` and `quarkus.openid-ssf.receiver.jdbc.*`) or provides its
+  own `SsfJtiDedupStore`.
+- Per-event-type CAEP / RISC payload parsing: `CapturedEvent.events()`
   returns the raw map keyed by alias for the demo to display.

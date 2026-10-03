@@ -20,58 +20,48 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-vertx-http</artifactId>
         </dependency>
+        <!--
+            The SSF receiver protocol implementation shared with the Spring Boot starter:
+            SET verification, metadata discovery, stream management, push and poll
+            delivery, de-duplication. Brings nimbus-jose-jwt and slf4j-api.
+        -->
         <dependency>
-            <groupId>com.nimbusds</groupId>
-            <artifactId>nimbus-jose-jwt</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-client-jackson</artifactId>
+            <groupId>org.easyssf</groupId>
+            <artifactId>easyssf-receiver</artifactId>
+            <version>${easyssf.version}</version>
         </dependency>
         <!--
-            Optional integration: when the consumer adds quarkus-oidc-client to their app,
-            outbound calls to the transmitter (currently only the JWKS / metadata fetch in v1)
-            are authenticated with a Bearer token from the configured OidcClient.
-            Marked optional so consumers without this dep don't pay the transitive cost.
+            The JDBC de-duplication store, used when the application has quarkus-agroal.
+            No dependencies beyond easyssf-receiver, so it is not optional.
+        -->
+        <dependency>
+            <groupId>org.easyssf</groupId>
+            <artifactId>easyssf-receiver-jdbc</artifactId>
+            <version>${easyssf.version}</version>
+        </dependency>
+        <!--
+            Optional integrations: the deployment processor registers the matching bean
+            only when the consumer has the extension (its capability) on the classpath.
         -->
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-oidc-client</artifactId>
             <optional>true</optional>
         </dependency>
-        <!--
-            Optional integration: when the consumer adds quarkus-micrometer (or one of
-            the registry-specific extensions like quarkus-micrometer-registry-prometheus),
-            the deployment processor swaps in MicrometerSsfReceiverMetrics, which
-            publishes quarkus.openid-ssf.receiver.* counters / timers / gauges to MeterRegistry.
-            Without it, NoopSsfReceiverMetrics is the @DefaultBean and is a no-op.
-        -->
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-micrometer</artifactId>
             <optional>true</optional>
         </dependency>
-        <!--
-            Pure unit tests (layer 1 in design/ssf-receiver-extension.md) live
-            under runtime/src/test/. They don't boot Quarkus — just plain
-            JUnit + Mockito + Hamcrest exercising package-local logic.
-            Anything needing the deployment processor / CDI wiring goes in
-            deployment/src/test/ instead.
-        -->
         <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-agroal</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.hamcrest</groupId>
-            <artifactId>hamcrest</artifactId>
-            <scope>test</scope>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-smallrye-health</artifactId>
+            <optional>true</optional>
         </dependency>
     </dependencies>
 
@@ -93,24 +83,6 @@
                 </executions>
             </plugin>
 
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>properties</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
-                </configuration>
-            </plugin>
 
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
