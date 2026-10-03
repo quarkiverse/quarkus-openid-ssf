@@ -1,6 +1,5 @@
 package io.quarkiverse.ssf.receiver.example;
 
-import java.util.Locale;
 import java.util.Map;
 
 import jakarta.inject.Inject;
@@ -17,11 +16,16 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
-import io.quarkiverse.ssf.receiver.runtime.stream.SsfStreamClient;
-import io.quarkiverse.ssf.receiver.runtime.stream.SsfStreamException;
-import io.quarkiverse.ssf.receiver.runtime.stream.StreamConfiguration;
-import io.quarkiverse.ssf.receiver.runtime.stream.status.StreamStatus;
+import org.easyssf.core.stream.SsfStreamStatus;
+import org.easyssf.receiver.stream.SsfStreamException;
 
+import io.quarkiverse.ssf.receiver.runtime.stream.SsfReceiverStreamClient;
+
+/**
+ * The stream configured with {@code stream-id}, through {@link SsfReceiverStreamClient}.
+ * Calls to the transmitter are authenticated by the token provider the extension
+ * selected, here the OIDC client configured in {@code application.properties}.
+ */
 @Path("/streams")
 public class SsfStreamsResource {
 
@@ -29,103 +33,74 @@ public class SsfStreamsResource {
     private static final String DEFAULT_ALIAS = "default";
 
     @Inject
-    SsfStreamClient streamClient;
+    SsfReceiverStreamClient streamClient;
 
-    /**
-     * Reads the live stream configuration from the transmitter via
-     * {@link SsfStreamClient#configuration()} (SSF spec §7.1.1.2).
-     */
+    /** GET /streams/default: the configuration of the stream, as the transmitter returns it (SSF 8.1.1). */
     @GET
     @Path("/{alias}")
     @Produces(MediaType.APPLICATION_JSON)
-    public StreamConfiguration configuration(@PathParam("alias") String alias) {
+    public Map<String, Object> configuration(@PathParam("alias") String alias) {
         requireDefaultAlias(alias);
         try {
-            return streamClient.configuration();
+            return streamClient.configuration().claims();
         } catch (SsfStreamException e) {
-            throw badGateway(e);
+            throw asResponse(e);
         }
     }
 
-    /**
-     * Reads the live stream status from the transmitter via {@link SsfStreamClient}.
-     * Outbound auth (Bearer token via client_credentials) is provided automatically by
-     * the OIDC-backed {@code TransmitterTokenProvider} when {@code quarkus-oidc-client}
-     * is configured — see {@code application.properties}.
-     */
+    /** GET /streams/default/status: the live status (SSF 8.1.2). */
     @GET
     @Path("/{alias}/status")
     @Produces(MediaType.APPLICATION_JSON)
-    public StreamStatus status(@PathParam("alias") String alias) {
+    public SsfStreamStatus status(@PathParam("alias") String alias) {
         requireDefaultAlias(alias);
         try {
             return streamClient.status();
         } catch (SsfStreamException e) {
-            throw badGateway(e);
+            throw asResponse(e);
         }
     }
 
-    /**
-     * Toggles the stream status — POST {@code /streams/default/status?status=paused&reason=...}.
-     * Convenience over the {@link SsfStreamClient#updateStatus} API.
-     */
+    /** POST /streams/default/status?status=paused&reason=... */
     @POST
     @Path("/{alias}/status")
     @Produces(MediaType.APPLICATION_JSON)
-    public StreamStatus updateStatus(
+    public SsfStreamStatus updateStatus(
             @PathParam("alias") String alias,
-            @QueryParam("status") String statusParam,
+            @QueryParam("status") String status,
             @QueryParam("reason") String reason) {
         requireDefaultAlias(alias);
-        if (statusParam == null || statusParam.isBlank()) {
+        if (status == null || status.isBlank()) {
             throw new BadRequestException("status query parameter is required (one of: enabled, paused, disabled)");
         }
-        StreamStatus.Status target;
         try {
-            target = StreamStatus.Status.valueOf(statusParam.toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            throw new BadRequestException("status must be one of: enabled, paused, disabled (got: " + statusParam + ")");
-        }
-        if (target == StreamStatus.Status.UNKNOWN) {
-            throw new BadRequestException("status must be one of: enabled, paused, disabled");
-        }
-        try {
-            return streamClient.updateStatus(target, reason);
+            return streamClient.updateStatus(status, reason);
         } catch (SsfStreamException e) {
-            throw badGateway(e);
+            throw asResponse(e);
         }
     }
 
     /**
-     * Triggers a Verification Event on the transmitter (§8.1.4.2). If {@code state}
-     * is omitted, a fresh random value is generated. Returns the state used so the
-     * caller can correlate the inbound Verification SET that arrives at /ssf/push.
+     * POST /streams/default/verify: asks the transmitter for a verification event (SSF
+     * 8.1.4). The returned state is the one the verification SET that arrives at
+     * {@code /ssf/push} has to echo; the extension checks it.
      */
     @POST
     @Path("/{alias}/verify")
     @Produces(MediaType.APPLICATION_JSON)
-    public VerificationRequested verify(
-            @PathParam("alias") String alias,
-            @QueryParam("state") String state) {
+    public VerificationRequested verify(@PathParam("alias") String alias) {
         requireDefaultAlias(alias);
         try {
-            String used;
-            if (state == null || state.isBlank()) {
-                used = streamClient.requestVerification();
-            } else {
-                streamClient.requestVerification(state);
-                used = state;
-            }
-            return new VerificationRequested(used);
+            return new VerificationRequested(streamClient.requestVerification());
         } catch (SsfStreamException e) {
-            throw badGateway(e);
+            throw asResponse(e);
         }
     }
 
     /**
-     * Adds a subject to the configured stream — POST {@code /streams/default/subjects/add}
-     * with a body like {@code { "subject": { "format": "email", "email": "..." }, "verified": true }}
-     * (SSF spec §8.1.3.2). Spec response is {@code 200 OK}.
+     * POST /streams/default/subjects/add with a body like
+     * {@code { "subject": { "format": "email", "email": "..." }, "verified": true }} (SSF
+     * 8.1.3.2).
      */
     @POST
     @Path("/{alias}/subjects/add")
@@ -136,17 +111,16 @@ public class SsfStreamsResource {
             throw new BadRequestException("body.subject is required");
         }
         try {
-            streamClient.addSubject(body.subject(), body.verified());
+            streamClient.addSubject(body.subject(), Boolean.TRUE.equals(body.verified()));
             return Response.ok().build();
         } catch (SsfStreamException e) {
-            throw badGateway(e);
+            throw asResponse(e);
         }
     }
 
     /**
-     * Removes a subject from the configured stream — POST {@code /streams/default/subjects/remove}
-     * with a body like {@code { "subject": { "format": "email", "email": "..." } }}
-     * (SSF spec §8.1.3.3). Spec response is {@code 204 No Content}.
+     * POST /streams/default/subjects/remove with a body like
+     * {@code { "subject": { "format": "email", "email": "..." } }} (SSF 8.1.3.3).
      */
     @POST
     @Path("/{alias}/subjects/remove")
@@ -160,7 +134,7 @@ public class SsfStreamsResource {
             streamClient.removeSubject(body.subject());
             return Response.noContent().build();
         } catch (SsfStreamException e) {
-            throw badGateway(e);
+            throw asResponse(e);
         }
     }
 
@@ -180,11 +154,11 @@ public class SsfStreamsResource {
         }
     }
 
-    private static WebApplicationException badGateway(SsfStreamException e) {
+    /** A validation error of the client is a 400, an answer of the transmitter a 502. */
+    private static WebApplicationException asResponse(SsfStreamException e) {
+        Response.Status status = (e.getStatusCode() == 0 && e.getCause() == null) ? Response.Status.BAD_REQUEST
+                : Response.Status.BAD_GATEWAY;
         return new WebApplicationException(
-                Response.status(Response.Status.BAD_GATEWAY)
-                        .type(MediaType.TEXT_PLAIN)
-                        .entity(e.getMessage())
-                        .build());
+                Response.status(status).type(MediaType.TEXT_PLAIN).entity(e.getMessage()).build());
     }
 }

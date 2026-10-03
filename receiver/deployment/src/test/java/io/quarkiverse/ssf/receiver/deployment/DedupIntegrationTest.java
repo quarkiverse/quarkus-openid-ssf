@@ -1,59 +1,49 @@
 package io.quarkiverse.ssf.receiver.deployment;
 
 import static io.restassured.RestAssured.given;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
-import org.jboss.shrinkwrap.api.ShrinkWrap;
-import org.jboss.shrinkwrap.api.spec.JavaArchive;
+import org.easyssf.core.event.SsfSubjectIdentifiers;
+import org.easyssf.receiver.event.SsfEventContext;
+import org.easyssf.receiver.event.SsfEventHandler;
+import org.easyssf.test.TestTransmitter;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-import io.quarkiverse.ssf.receiver.runtime.event.SsfEventContext;
-import io.quarkiverse.ssf.receiver.runtime.event.SsfEventHandler;
 import io.quarkus.test.QuarkusExtensionTest;
 import io.restassured.RestAssured;
 import io.restassured.config.EncoderConfig;
 import io.restassured.http.ContentType;
 
 /**
- * Layer-2 test: jti dedup integration. The default
- * {@code InMemorySsfJtiDedupStore} drops a SET whose {@code iss::jti} key
- * matches one already dispatched. The receiver still answers {@code 202}
- * (the SET was successfully received and verified — we just don't deliver
- * it to the handler twice).
- *
- * <p>
- * Layer-1 covers the dedup store itself; this test covers the wiring through
- * {@code SsfPushRoute.handle}.
+ * The in-memory de-duplication store skips a SET that was processed before: the
+ * transmitter still gets its {@code 202}, the handler is not invoked again.
  */
 public class DedupIntegrationTest {
 
-    private static final String ISSUER = "https://test.transmitter/realms/r1";
-    private static final String AUDIENCE = "https://my-receiver.example/ssf";
-
     @RegisterExtension
     static final QuarkusExtensionTest TEST = new QuarkusExtensionTest()
-            .setArchiveProducer(() -> ShrinkWrap.create(JavaArchive.class)
-                    .addClasses(CountingHandler.class, JwksWireMock.class))
-            .setBeforeAllCustomizer(() -> JwksWireMock.start(ISSUER, AUDIENCE))
-            .setAfterAllCustomizer(JwksWireMock::stop)
-            .overrideConfigKey("quarkus.openid-ssf.receiver.transmitter-issuer", ISSUER)
-            .overrideConfigKey("quarkus.openid-ssf.receiver.expected-audience", AUDIENCE)
+            .setArchiveProducer(() -> TestTransmitters.archive(CountingHandler.class))
+            .setBeforeAllCustomizer(() -> {
+                TestTransmitter transmitter = TestTransmitters.start();
+                TestTransmitters.addPushStream(TestTransmitters.DEFAULT, transmitter);
+            })
+            .setAfterAllCustomizer(TestTransmitters::stop)
+            .overrideConfigKey("quarkus.openid-ssf.receiver.transmitter-issuer",
+                    TestTransmitters.ref(TestTransmitters.issuerProperty(TestTransmitters.DEFAULT)))
+            .overrideConfigKey("quarkus.openid-ssf.receiver.expected-audience", TestTransmitter.AUDIENCE)
             .overrideConfigKey("quarkus.openid-ssf.receiver.stream-management", "TRANSMITTER")
-            .overrideConfigKey("quarkus.openid-ssf.receiver.stream-id", "stream-1")
+            .overrideConfigKey("quarkus.openid-ssf.receiver.stream-id",
+                    TestTransmitters.ref(TestTransmitters.streamIdProperty(TestTransmitters.DEFAULT)))
             .overrideConfigKey("quarkus.openid-ssf.receiver.delivery-method", "PUSH")
-            // Dedup is on by default; explicit for clarity.
+            .overrideConfigKey("quarkus.openid-ssf.receiver.transmitter-access-token", TestTransmitter.ACCESS_TOKEN)
             .overrideConfigKey("quarkus.openid-ssf.receiver.dedup.enabled", "true");
 
     @Inject
@@ -62,56 +52,35 @@ public class DedupIntegrationTest {
     @BeforeAll
     static void registerSeceventEncoder() {
         RestAssured.config = RestAssured.config().encoderConfig(
-                EncoderConfig.encoderConfig()
-                        .encodeContentTypeAs("application/secevent+jwt", ContentType.TEXT));
+                EncoderConfig.encoderConfig().encodeContentTypeAs("application/secevent+jwt", ContentType.TEXT));
     }
 
-    private static void postSet(String setJwt) {
-        given()
-                .header("Content-Type", "application/secevent+jwt")
-                .body(setJwt)
-                .when()
-                .post("/ssf/push")
-                .then()
-                .statusCode(202);
+    private static void postSet(String set) {
+        given().header("Content-Type", "application/secevent+jwt").body(set)
+                .when().post("/ssf/push")
+                .then().statusCode(202);
     }
 
     @Test
-    @DisplayName("Same SET posted twice → handler invoked exactly once")
-    void duplicateSkipped() throws Exception {
-        String setJwt = System.getProperty(JwksWireMock.PROP_VALID_SET);
-        CountingHandler captured = (CountingHandler) handler;
-        captured.reset();
+    @DisplayName("Same SET posted twice -> handler invoked exactly once, 202 both times")
+    void duplicateSkipped() {
+        String set = TestTransmitters.current().set("CaepSessionRevoked", SsfSubjectIdentifiers.opaque("user-1234"));
+        CountingHandler counting = (CountingHandler) handler;
+        counting.invocations.set(0);
 
-        // First post — should hit the handler.
-        postSet(setJwt);
-        assertTrue(captured.firstInvocation.await(5, TimeUnit.SECONDS),
-                "first post should reach the handler");
+        postSet(set);
+        postSet(set);
 
-        // Second post — same jti+iss, dedup store should skip the dispatch.
-        postSet(setJwt);
-
-        // Give the dispatch executor a moment to (not) re-fire. We can't await
-        // a "didn't happen" event directly; sleep briefly then assert count.
-        Thread.sleep(250);
-        assertThat("handler must be invoked exactly once for two posts of the same SET",
-                captured.invocations.get(), equalTo(1));
+        assertEquals(1, counting.invocations.get(), "handler must be invoked once for two posts of the same SET");
     }
 
     @Singleton
     public static class CountingHandler implements SsfEventHandler {
-        volatile CountDownLatch firstInvocation = new CountDownLatch(1);
         final AtomicInteger invocations = new AtomicInteger();
 
         @Override
         public void handle(SsfEventContext eventContext) {
             invocations.incrementAndGet();
-            firstInvocation.countDown();
-        }
-
-        void reset() {
-            firstInvocation = new CountDownLatch(1);
-            invocations.set(0);
         }
     }
 }

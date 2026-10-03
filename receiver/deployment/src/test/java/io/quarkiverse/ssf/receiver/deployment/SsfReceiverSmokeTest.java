@@ -3,197 +3,193 @@ package io.quarkiverse.ssf.receiver.deployment;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
-import org.jboss.shrinkwrap.api.ShrinkWrap;
-import org.jboss.shrinkwrap.api.spec.JavaArchive;
+import org.easyssf.core.event.SsfEventToken;
+import org.easyssf.core.event.SsfSubjectIdentifiers;
+import org.easyssf.core.metadata.SsfTransmitterMetadata;
+import org.easyssf.core.stream.SsfStreamConfiguration;
+import org.easyssf.core.stream.SsfStreamStatus;
+import org.easyssf.receiver.event.SsfEventContext;
+import org.easyssf.receiver.event.SsfEventHandler;
+import org.easyssf.receiver.transmitter.SsfTransmitter;
+import org.easyssf.receiver.transmitter.SsfTransmitters;
+import org.easyssf.test.TestTransmitter;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-import io.quarkiverse.ssf.receiver.runtime.event.SsfEventContext;
-import io.quarkiverse.ssf.receiver.runtime.event.SsfEventHandler;
-import io.quarkiverse.ssf.receiver.runtime.event.SsfEventToken;
-import io.quarkiverse.ssf.receiver.runtime.metadata.SsfConfigurationResolver;
-import io.quarkiverse.ssf.receiver.runtime.metadata.SsfTransmitterMetadata;
-import io.quarkiverse.ssf.receiver.runtime.stream.SsfStreamClient;
-import io.quarkiverse.ssf.receiver.runtime.stream.StreamConfiguration;
-import io.quarkiverse.ssf.receiver.runtime.stream.status.StreamStatus;
-import io.quarkiverse.ssf.receiver.runtime.stream.subjects.SsfSubjects;
+import io.quarkiverse.ssf.receiver.runtime.stream.SsfReceiverStreamClient;
 import io.quarkus.test.QuarkusExtensionTest;
 import io.restassured.RestAssured;
 import io.restassured.config.EncoderConfig;
 import io.restassured.http.ContentType;
 
+/**
+ * The receiver against easyssf's test transmitter: PUSH delivery with a stream the
+ * operator created ({@code stream-management=TRANSMITTER}), the stream management API
+ * through {@link SsfReceiverStreamClient}, and the transmitter metadata.
+ */
 public class SsfReceiverSmokeTest {
-
-    private static final String ISSUER = "https://test.transmitter/realms/r1";
-    private static final String AUDIENCE = "https://my-receiver.example/ssf";
 
     @RegisterExtension
     static final QuarkusExtensionTest TEST = new QuarkusExtensionTest()
-            .setArchiveProducer(() -> ShrinkWrap.create(JavaArchive.class)
-                    .addClasses(CapturingHandler.class, JwksWireMock.class))
-            .setBeforeAllCustomizer(() -> JwksWireMock.start(ISSUER, AUDIENCE))
-            .setAfterAllCustomizer(JwksWireMock::stop)
-            .overrideConfigKey("quarkus.openid-ssf.receiver.transmitter-issuer", ISSUER)
-            .overrideConfigKey("quarkus.openid-ssf.receiver.expected-audience", AUDIENCE)
+            .setArchiveProducer(() -> TestTransmitters.archive(CapturingHandler.class))
+            .setBeforeAllCustomizer(() -> {
+                TestTransmitter transmitter = TestTransmitters.start();
+                TestTransmitters.addPushStream(TestTransmitters.DEFAULT, transmitter);
+            })
+            .setAfterAllCustomizer(TestTransmitters::stop)
+            .overrideConfigKey("quarkus.openid-ssf.receiver.transmitter-issuer",
+                    TestTransmitters.ref(TestTransmitters.issuerProperty(TestTransmitters.DEFAULT)))
+            .overrideConfigKey("quarkus.openid-ssf.receiver.expected-audience", TestTransmitter.AUDIENCE)
             .overrideConfigKey("quarkus.openid-ssf.receiver.stream-management", "TRANSMITTER")
-            .overrideConfigKey("quarkus.openid-ssf.receiver.stream-id", "stream-1")
-            .overrideConfigKey("quarkus.openid-ssf.receiver.delivery-method", "PUSH");
+            .overrideConfigKey("quarkus.openid-ssf.receiver.stream-id",
+                    TestTransmitters.ref(TestTransmitters.streamIdProperty(TestTransmitters.DEFAULT)))
+            .overrideConfigKey("quarkus.openid-ssf.receiver.delivery-method", "PUSH")
+            .overrideConfigKey("quarkus.openid-ssf.receiver.push.endpoint-path", "/ssf/push")
+            .overrideConfigKey("quarkus.openid-ssf.receiver.transmitter-access-token", TestTransmitter.ACCESS_TOKEN);
 
     @Inject
     SsfEventHandler handler;
 
     @Inject
-    SsfStreamClient streamClient;
+    SsfReceiverStreamClient streamClient;
 
     @Inject
-    SsfConfigurationResolver metadataResolver;
+    SsfTransmitters transmitters;
 
     @BeforeAll
     static void registerSeceventEncoder() {
         RestAssured.config = RestAssured.config().encoderConfig(
-                EncoderConfig.encoderConfig()
-                        .encodeContentTypeAs("application/secevent+jwt", ContentType.TEXT));
+                EncoderConfig.encoderConfig().encodeContentTypeAs("application/secevent+jwt", ContentType.TEXT));
+    }
+
+    @BeforeEach
+    void reset() {
+        ((CapturingHandler) handler).captured.clear();
     }
 
     @Test
-    void pushedSetIsVerifiedAndDispatched() throws Exception {
-        String setJwt = System.getProperty(JwksWireMock.PROP_VALID_SET);
-        String expectedJti = System.getProperty(JwksWireMock.PROP_EXPECTED_JTI);
-        long expectedIatSec = Long.parseLong(System.getProperty(JwksWireMock.PROP_EXPECTED_IAT_SEC));
-        String expectedIss = System.getProperty(JwksWireMock.PROP_EXPECTED_ISS);
-        String expectedAud = System.getProperty(JwksWireMock.PROP_EXPECTED_AUD);
-        String expectedTxn = System.getProperty(JwksWireMock.PROP_EXPECTED_TXN);
-        String expectedEventType = System.getProperty(JwksWireMock.PROP_EXPECTED_EVENT_TYPE);
-        String expectedSubjectFormat = System.getProperty(JwksWireMock.PROP_EXPECTED_SUBJECT_FORMAT);
-        String expectedSubjectValue = System.getProperty(JwksWireMock.PROP_EXPECTED_SUBJECT_VALUE);
+    void pushedSetIsVerifiedAndDispatchedBeforeTheResponse() throws Exception {
+        TestTransmitter transmitter = TestTransmitters.current();
+        String set = transmitter.set("CaepSessionRevoked", SsfSubjectIdentifiers.opaque("user-1234"));
+        String expectedJti = com.nimbusds.jwt.SignedJWT.parse(set).getJWTClaimsSet().getJWTID();
 
-        given()
-                .header("Content-Type", "application/secevent+jwt")
-                .body(setJwt)
-                .when()
-                .post("/ssf/push")
-                .then()
-                .statusCode(202);
+        given().header("Content-Type", "application/secevent+jwt").body(set)
+                .when().post("/ssf/push")
+                .then().statusCode(202);
 
-        CapturingHandler capturing = (CapturingHandler) handler;
-        assertTrue(capturing.latch.await(5, TimeUnit.SECONDS), "handler was not invoked within 5s");
-        SsfEventToken eventToken = capturing.last.get();
-        assertNotNull(eventToken);
+        // the handler ran before the 202, no waiting needed
+        List<SsfEventToken> captured = ((CapturingHandler) handler).captured;
+        assertEquals(1, captured.size());
+        SsfEventToken eventToken = captured.get(0);
         assertThat(eventToken.jti(), equalTo(expectedJti));
-        assertThat(eventToken.iss(), equalTo(expectedIss));
+        assertThat(eventToken.iss(), equalTo(transmitter.issuer()));
         assertThat(eventToken.iat(), is(notNullValue()));
-        assertThat(eventToken.iat().getEpochSecond(), equalTo(expectedIatSec));
+        assertThat(eventToken.aud(), equalTo(List.of(TestTransmitter.AUDIENCE)));
+        assertThat(eventToken.subjectId().get("format"), equalTo("opaque"));
+        assertThat(eventToken.subjectId().get("id"), equalTo("user-1234"));
+        assertThat(eventToken.events().keySet(), equalTo(java.util.Set.of(TestTransmitters.EVENT_TYPE)));
+        assertThat(((Map<?, ?>) eventToken.events().get(TestTransmitters.EVENT_TYPE)).get("event_timestamp"),
+                is(notNullValue()));
+    }
 
-        assertThat(eventToken.aud(), equalTo(List.of(expectedAud)));
-        assertThat(eventToken.txn(), equalTo(expectedTxn));
+    @Test
+    void setWithMismatchedAudienceIsRejected() {
+        TestTransmitter transmitter = TestTransmitters.current();
+        String set = transmitter.signSet(transmitter
+                .setClaims("CaepSessionRevoked", SsfSubjectIdentifiers.opaque("user-1234"))
+                .audience("https://some.other.receiver.example/")
+                .build());
 
-        assertThat(eventToken.subjectId(), is(notNullValue()));
-        assertThat(eventToken.subjectId().get("format"), equalTo(expectedSubjectFormat));
-        assertThat(eventToken.subjectId().get("id"), equalTo(expectedSubjectValue));
-
-        assertThat(eventToken.events(), is(notNullValue()));
-        assertThat(eventToken.events().keySet(), equalTo(java.util.Set.of(expectedEventType)));
-        Object eventPayload = eventToken.events().get(expectedEventType);
-        assertThat(eventPayload, is(notNullValue()));
-        assertThat(((Map<?, ?>) eventPayload).get("initiating_entity"), equalTo("policy"));
-
-        assertThat(capturing.invocations.get(), equalTo(1));
+        given().header("Content-Type", "application/secevent+jwt").body(set)
+                .when().post("/ssf/push")
+                .then().statusCode(400)
+                .contentType("application/json")
+                .body("err", equalTo("invalid_audience"));
+        assertEquals(0, ((CapturingHandler) handler).captured.size());
     }
 
     @Test
     void subjectsCanBeAddedAndRemoved() {
-        // Each call returns void on success (200 / 204); reaching the next line means success.
-        streamClient.addSubject(SsfSubjects.email("user@example.com"), Boolean.TRUE);
-        streamClient.removeSubject(SsfSubjects.email("user@example.com"));
+        TestTransmitter transmitter = TestTransmitters.current();
+        Map<String, Object> subject = SsfSubjectIdentifiers.email("user@example.com");
 
-        // iss_sub form
-        streamClient.addSubject(SsfSubjects.issSub(ISSUER, "user-1234"), null);
+        streamClient.addSubject(subject, true);
+        streamClient.removeSubject(subject);
+        streamClient.addSubject(SsfSubjectIdentifiers.issSub(transmitter.issuer(), "user-1234"), false);
+
+        assertThat(transmitter.addedSubjects(), hasItem(subject));
+        assertThat(transmitter.removedSubjects(), hasItem(subject));
     }
 
     @Test
     void verificationCanBeRequested() {
         String state = streamClient.requestVerification();
+
         assertNotNull(state);
-        assertThat(state, is(notNullValue()));
-        // No exception thrown — the WireMock stub returns 204 No Content as required by §8.1.4.2.
+        assertThat(TestTransmitters.current().verificationRequests(), hasItem(state));
+        assertThat(streamClient.transmitter().getStreamVerification().isPending(), is(true));
     }
 
     @Test
     void streamConfigurationIsResolvedFromTransmitter() {
-        StreamConfiguration cfg = streamClient.configuration();
-        assertNotNull(cfg);
-        assertThat(cfg.streamId(), equalTo("stream-1"));
-        assertThat(cfg.iss(), equalTo(ISSUER));
-        assertThat(cfg.aud(), equalTo(List.of(AUDIENCE)));
-        assertThat(cfg.eventsSupported(), is(notNullValue()));
-        assertThat(cfg.eventsRequested(), is(notNullValue()));
-        assertThat(cfg.eventsDelivered(), is(notNullValue()));
-        assertThat(cfg.delivery(), is(notNullValue()));
-        assertThat(cfg.delivery().method(), equalTo("urn:ietf:rfc:8935"));
-        assertThat(cfg.delivery().endpointUrl(), is(notNullValue()));
-        assertThat(cfg.minVerificationInterval(), equalTo(JwksWireMock.MIN_VERIFICATION_INTERVAL));
-        assertThat(cfg.inactivityTimeout(), equalTo(JwksWireMock.INACTIVITY_TIMEOUT));
-        assertThat(cfg.description(), equalTo(JwksWireMock.STREAM_DESCRIPTION));
+        SsfTransmitter transmitter = transmitters.primary().orElseThrow();
+        TestTransmitters.awaitRegistered(transmitter);
+        String streamId = System.getProperty(TestTransmitters.streamIdProperty(TestTransmitters.DEFAULT));
+
+        SsfStreamConfiguration configuration = streamClient.configuration();
+        assertThat(configuration.streamId(), equalTo(streamId));
+        assertThat(configuration.issuer(), equalTo(TestTransmitters.current().issuer()));
+        assertThat(configuration.audience(), equalTo(List.of(TestTransmitter.CLIENT_ID + "/" + streamId)));
+        assertThat(configuration.deliveryMethod(), equalTo("urn:ietf:rfc:8935"));
+        assertThat(configuration.deliveryEndpointUrl().toString(), equalTo(TestTransmitters.PUSH_DELIVERY_URL));
+        assertThat(configuration.eventsDelivered(), equalTo(List.of(TestTransmitters.EVENT_TYPE)));
+        assertThat(configuration.description(), equalTo("test stream"));
+
+        // the startup lookup left the same configuration with the receiver
+        assertThat(streamClient.stream().orElseThrow().streamId(), equalTo(streamId));
+        assertThat(streamClient.streamId(), equalTo(streamId));
     }
 
     @Test
-    void streamStatusIsResolvedFromMetadata() {
-        String expectedStatus = System.getProperty(JwksWireMock.PROP_EXPECTED_STREAM_STATUS);
-        String expectedReason = System.getProperty(JwksWireMock.PROP_EXPECTED_STREAM_REASON);
+    void streamStatusIsReadFromTransmitter() {
+        SsfStreamStatus status = streamClient.status();
+        assertThat(status.streamId(), equalTo(streamClient.streamId()));
+        assertThat(status.status(), equalTo(SsfStreamStatus.ENABLED));
 
-        SsfTransmitterMetadata metadata = metadataResolver.get();
-        assertNotNull(metadata);
+        SsfStreamStatus paused = streamClient.updateStatus("paused", "maintenance");
+        assertThat(paused.status(), equalTo(SsfStreamStatus.PAUSED));
+    }
+
+    @Test
+    void transmitterMetadataIsResolved() {
+        SsfTransmitterMetadata metadata = transmitters.primary().orElseThrow().getMetadataResolver().resolve();
+        assertThat(metadata.issuer(), equalTo(TestTransmitters.current().issuer()));
+        assertThat(metadata.jwksUri().toString(), equalTo(TestTransmitters.current().jwksUri()));
         assertThat(metadata.statusEndpoint(), is(notNullValue()));
-        assertThat(metadata.jwksUri(), is(notNullValue()));
-
-        StreamStatus status = streamClient.status();
-        assertNotNull(status);
-        assertThat(status.streamId(), equalTo("stream-1"));
-        assertThat(status.status(), equalTo(expectedStatus));
-        assertThat(status.reason(), equalTo(expectedReason));
-        assertThat(status.known(), equalTo(StreamStatus.Status.PAUSED));
-    }
-
-    @Test
-    void setWithMismatchedAudienceIsRejected() {
-        String wrongAudSet = System.getProperty(JwksWireMock.PROP_WRONG_AUD_SET);
-
-        given()
-                .header("Content-Type", "application/secevent+jwt")
-                .body(wrongAudSet)
-                .when()
-                .post("/ssf/push")
-                .then()
-                .statusCode(400);
     }
 
     @Singleton
     public static class CapturingHandler implements SsfEventHandler {
-        final CountDownLatch latch = new CountDownLatch(1);
-        final AtomicReference<SsfEventToken> last = new AtomicReference<>();
-        final AtomicInteger invocations = new AtomicInteger();
+        final List<SsfEventToken> captured = new CopyOnWriteArrayList<>();
 
         @Override
         public void handle(SsfEventContext eventContext) {
-            last.set(eventContext.eventToken());
-            invocations.incrementAndGet();
-            latch.countDown();
+            captured.add(eventContext.eventToken());
         }
     }
 }

@@ -1,0 +1,154 @@
+# Requests for the example resource server (IntelliJ IDEA / JetBrains HTTP Client).
+#
+# Prerequisites: Keycloak (receiver/examples/keycloak) and the example-resource-server are running.
+# Run the requests of a scenario from top to bottom, or all requests of the file.
+
+@keycloak = http://localhost:8080
+@realm = {{keycloak}}/realms/ssf-demo
+@resourceServer = http://localhost:8081
+
+# ==============================================================================
+# Scenario 1: the user logs out, the access token of that session is rejected
+# ==============================================================================
+
+### 1.1 Log in as tester
+POST {{realm}}/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type = password &
+client_id = example-cli &
+username = tester &
+password = test
+
+> {%
+    client.test("tokens issued", () => client.assert(response.status === 200));
+    client.global.set("access_token", response.body.access_token);
+    client.global.set("refresh_token", response.body.refresh_token);
+%}
+
+### 1.2 Call the API with the access token: 200
+GET {{resourceServer}}/api/me
+Authorization: Bearer {{access_token}}
+
+> {%
+    client.test("access token is accepted", () => client.assert(response.status === 200));
+%}
+
+### 1.3 Log out in Keycloak: ends the session, Keycloak sends a session-revoked event
+POST {{realm}}/protocol/openid-connect/logout
+Content-Type: application/x-www-form-urlencoded
+
+client_id = example-cli &
+refresh_token = {{refresh_token}}
+
+> {%
+    client.test("logged out", () => client.assert(response.status === 204));
+%}
+
+### 1.4 Call the API with the same access token: 401
+# The token has not expired, but its session was revoked.
+< {%
+    // give Keycloak a moment to deliver the event
+    const until = Date.now() + 4000;
+    while (Date.now() < until) {
+    }
+%}
+GET {{resourceServer}}/api/me
+Authorization: Bearer {{access_token}}
+
+> {%
+    client.test("access token of the revoked session is rejected", () => client.assert(response.status === 401));
+%}
+
+# ==============================================================================
+# Scenario 2: an admin signs the user out of all sessions, all access tokens issued before are rejected
+# ==============================================================================
+
+### 2.1 Log in as tester
+POST {{realm}}/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type = password &
+client_id = example-cli &
+username = tester &
+password = test
+
+> {%
+    client.global.set("access_token", response.body.access_token);
+%}
+
+### 2.2 Call the API with the access token: 200
+GET {{resourceServer}}/api/me
+Authorization: Bearer {{access_token}}
+
+### 2.3 Log in as Keycloak admin
+POST {{keycloak}}/realms/master/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type = password &
+client_id = admin-cli &
+username = admin &
+password = admin
+
+> {%
+    client.global.set("admin_token", response.body.access_token);
+%}
+
+### 2.4 Look up the user
+GET {{keycloak}}/admin/realms/ssf-demo/users?username=tester&exact=true
+Authorization: Bearer {{admin_token}}
+
+> {%
+    client.global.set("user_id", response.body[0].id);
+%}
+
+### 2.5 Sign the user out of all sessions: Keycloak sends a session-revoked event for the user
+POST {{keycloak}}/admin/realms/ssf-demo/users/{{user_id}}/logout
+Authorization: Bearer {{admin_token}}
+
+### 2.6 Call the API with the access token from 2.1: 401
+< {%
+    // give Keycloak a moment to deliver the event
+    const until = Date.now() + 4000;
+    while (Date.now() < until) {
+    }
+%}
+GET {{resourceServer}}/api/me
+Authorization: Bearer {{access_token}}
+
+> {%
+    client.test("access tokens issued before the sign-out are rejected", () => client.assert(response.status === 401));
+%}
+
+# ==============================================================================
+# Looking around
+# ==============================================================================
+
+### The API needs an access token: 401
+GET {{resourceServer}}/api/me
+
+### Health of the receiver: metadata resolved, stream registered, last poll (poll profile)
+GET {{resourceServer}}/q/health/well
+
+### Metrics of the receiver (Prometheus format): easyssf_receiver_sets_total, easyssf_receiver_events_total, easyssf_receiver_poll_seconds
+GET {{resourceServer}}/q/metrics
+
+### SSF transmitter metadata of the realm
+GET {{realm}}/.well-known/ssf-configuration
+
+### The stream of the resource server in Keycloak (run 2.3 first)
+GET {{keycloak}}/admin/realms/ssf-demo/ssf/clients/example-resource-server/stream
+Authorization: Bearer {{admin_token}}
+
+### The push endpoint only accepts Keycloak: 401 authentication_failed without the Authorization header of the stream
+POST {{resourceServer}}/ssf/push
+Content-Type: application/secevent+jwt
+
+not-a-security-event-token
+
+### The push endpoint rejects anything that is not a SET signed by Keycloak: 400 invalid_request
+POST {{resourceServer}}/ssf/push
+Content-Type: application/secevent+jwt
+Authorization: Bearer example-resource-server-push-secret
+
+not-a-security-event-token

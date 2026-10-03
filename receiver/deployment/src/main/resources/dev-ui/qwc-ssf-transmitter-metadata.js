@@ -4,9 +4,9 @@ import '@vaadin/button';
 
 /**
  * Read-only view of the SSF transmitter's `.well-known/ssf-configuration`
- * document — fetched (and cached) by SsfConfigurationResolver via a Quarkus
- * REST client. No outbound SSF management calls happen here, so this page
- * works regardless of whether the receiver-managed registrar has finished.
+ * document, fetched (and cached) by easyssf's SsfTransmitterMetadataResolver.
+ * No stream management call happens here, so this page works regardless of
+ * whether the stream registrar has finished.
  */
 export class QwcSsfTransmitterMetadata extends LitElement {
 

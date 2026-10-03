@@ -1,56 +1,52 @@
 package io.quarkiverse.ssf.receiver.runtime.auth;
 
-import java.util.Optional;
+import java.time.Duration;
 
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
+import org.easyssf.receiver.transmitter.SsfTransmitterTokenProvider;
+import org.easyssf.receiver.transmitter.SsfTransmitterUnavailableException;
 
-import org.jboss.logging.Logger;
-
-import io.quarkiverse.ssf.receiver.runtime.SsfReceiverConfig;
 import io.quarkus.oidc.client.OidcClient;
 import io.quarkus.oidc.client.Tokens;
 
 /**
- * Resolves transmitter access tokens via Quarkus {@link OidcClient}. Only registered
- * by {@code SsfReceiverProcessor} when {@code quarkus-oidc-client} is on the consumer's
- * classpath, so this class is never loaded otherwise.
- *
- * <p>
- * The OidcClient itself is configured by the consumer via {@code quarkus.oidc-client.*}
- * properties (auth-server-url, client-id, credentials, grant type, …). We simply consume
- * whatever access token it produces.
+ * Obtains access tokens from a Quarkus {@link OidcClient}, configured by the application
+ * with {@code quarkus.oidc-client.*} (auth server, client id, credentials, grant). Every
+ * call fetches a token; the client is expected to be configured with the
+ * {@code client} (client credentials) grant.
  */
-@ApplicationScoped
-public class OidcTransmitterTokenProvider implements TransmitterTokenProvider {
+public final class OidcTransmitterTokenProvider implements SsfTransmitterTokenProvider {
 
-    private static final Logger LOG = Logger.getLogger(OidcTransmitterTokenProvider.class);
+    private final OidcClient oidcClient;
 
-    @Inject
-    OidcClient oidcClient;
+    private final String clientName;
 
-    @Inject
-    SsfReceiverConfig config;
+    private final Duration timeout;
+
+    public OidcTransmitterTokenProvider(OidcClient oidcClient, String clientName, Duration timeout) {
+        this.oidcClient = oidcClient;
+        this.clientName = clientName;
+        this.timeout = timeout;
+    }
 
     @Override
-    public Optional<String> accessToken() {
+    public String getAccessToken() {
         try {
-            Tokens tokens = oidcClient.getTokens().await().atMost(config.oidc().tokenTimeout());
-            if (tokens == null) {
-                return Optional.empty();
-            }
-            return Optional.ofNullable(tokens.getAccessToken());
+            Tokens tokens = oidcClient.getTokens().await().atMost(timeout);
+            return (tokens != null) ? tokens.getAccessToken() : null;
         } catch (RuntimeException e) {
-            LOG.warnf("Failed to obtain transmitter access token via OidcClient: %s", summarize(e));
-            LOG.debugf(e, "OidcClient token fetch — full stack");
-            return Optional.empty();
+            throw new SsfTransmitterUnavailableException(
+                    "Could not obtain an access token from the OIDC client '" + clientName + "': " + summarize(e), e);
         }
     }
 
+    @Override
+    public String toString() {
+        return "OidcTransmitterTokenProvider(" + clientName + ")";
+    }
+
     /**
-     * One-line summary of an exception. Some auth-server failure modes (e.g.
-     * proxy / load-balancer returning an HTML error page) put the entire body
-     * in {@code getMessage()}; this trims to the first line and caps length.
+     * One line of an exception. Some auth server failure modes (a proxy returning an HTML
+     * error page) put the entire body in the message.
      */
     private static String summarize(Throwable t) {
         String msg = t.getMessage();
@@ -62,7 +58,7 @@ public class OidcTransmitterTokenProvider implements TransmitterTokenProvider {
             msg = msg.substring(0, newline);
         }
         if (msg.length() > 200) {
-            msg = msg.substring(0, 200) + "…";
+            msg = msg.substring(0, 200) + "...";
         }
         return t.getClass().getSimpleName() + ": " + msg.trim();
     }

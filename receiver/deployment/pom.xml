@@ -25,10 +25,6 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-vertx-http-deployment</artifactId>
         </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-client-jackson-deployment</artifactId>
-        </dependency>
 
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -40,9 +36,32 @@
             <artifactId>rest-assured</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+            easyssf's test transmitter: metadata, JWK Set, signed SETs, a token endpoint,
+            the stream API and a poll endpoint in-process. The tests load it parent-first
+            (see TestTransmitters) so that test methods, which run in the Quarkus class
+            loader, can drive the instance started before the application.
+        -->
         <dependency>
-            <groupId>org.wiremock</groupId>
-            <artifactId>wiremock</artifactId>
+            <groupId>org.easyssf</groupId>
+            <artifactId>easyssf-test</artifactId>
+            <version>${easyssf.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- an H2 datasource for the JDBC de-duplication store; the other tests see Agroal without a datasource -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-agroal-deployment</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jdbc-h2-deployment</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

@@ -15,11 +15,7 @@ endif::add-copy-button-to-config-props[]
 
 [.description]
 --
-Master kill switch for the SSF receiver. When `false`, all startup observers (validator, push route registration, transmitter probe, receiver-managed registrar, POLL scheduler) become no-ops and no inbound SETs are accepted or pulled. Other beans (`SsfStreamClient`, metrics, alias resolver) stay wired in CDI so application code that touches them directly still works — but nothing happens automatically.
-
-Useful for `%test.quarkus.openid-ssf.receiver.enabled=false` or runtime kill-switch via env var. Defaults to `true` so existing apps upgrade without behavior change.
-
-Note: `transmitter-issuer()` is still resolved by the config layer at startup, so even when disabled, set it to any non-empty URI (the value is never read in disabled mode).
+Master kill switch for the SSF receiver. When `false`, no push endpoint is registered, no stream is looked up or registered and no transmitter is polled. The beans of the extension stay injectable, but need a configured transmitter to do anything.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -32,15 +28,24 @@ endif::add-copy-button-to-env-var[]
 |boolean
 |`+++true+++`
 
+h|[[quarkus-openid-ssf-receiver_section_quarkus-openid-ssf-receiver]] [.section-name.section-level0]##link:#quarkus-openid-ssf-receiver_section_quarkus-openid-ssf-receiver[The transmitters this receiver gets events from]##
+h|Type
+h|Default
+
 a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-issuer]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-issuer[`+++quarkus.openid-ssf.receiver.transmitter-issuer+++`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.transmitter-issuer+++[]
 endif::add-copy-button-to-config-props[]
 
 
+`+++quarkus.openid-ssf.receiver."transmitter-name".transmitter-issuer+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".transmitter-issuer+++[]
+endif::add-copy-button-to-config-props[]
+
 [.description]
 --
-Issuer URL of the SSF transmitter (e.g. a Keycloak realm URL).
+Issuer of the SSF transmitter, for example a Keycloak realm URL. Every inbound SET must carry this value as its `iss` claim. It must use `https`, or `http` on a loopback address, see `allow-insecure-http()`.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -50,8 +55,88 @@ ifndef::add-copy-button-to-env-var[]
 Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_TRANSMITTER_ISSUER+++`
 endif::add-copy-button-to-env-var[]
 --
+|string
+|
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-metadata-url]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-metadata-url[`+++quarkus.openid-ssf.receiver.transmitter-metadata-url+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.transmitter-metadata-url+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`+++quarkus.openid-ssf.receiver."transmitter-name".transmitter-metadata-url+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".transmitter-metadata-url+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+Location of the transmitter's SSF configuration metadata.
+
+If unset, the URL is derived from `transmitter-issuer()` per SSF 1.0 section 7.2: `/.well-known/ssf-configuration` is inserted between the host and the path of the issuer, so `https://tr.example.com/realms/r1` is looked up at `https://tr.example.com/.well-known/ssf-configuration/realms/r1`. As transmitters that grew out of OpenID providers tend to append it instead (`https://tr.example.com/realms/r1/.well-known/ssf-configuration`), that location is tried as a fallback.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_TRANSMITTER_METADATA_URL+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_TRANSMITTER_METADATA_URL+++`
+endif::add-copy-button-to-env-var[]
+--
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/net/URI.html[URI]
-|required icon:exclamation-circle[title=Configuration property is required]
+|
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-jwks-url]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-jwks-url[`+++quarkus.openid-ssf.receiver.transmitter-jwks-url+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.transmitter-jwks-url+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`+++quarkus.openid-ssf.receiver."transmitter-name".transmitter-jwks-url+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".transmitter-jwks-url+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+Location of the JWK Set used to verify SET signatures. Discovered from the transmitter metadata (`jwks_uri`) when not set.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_TRANSMITTER_JWKS_URL+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_TRANSMITTER_JWKS_URL+++`
+endif::add-copy-button-to-env-var[]
+--
+|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/net/URI.html[URI]
+|
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-allow-insecure-http]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-allow-insecure-http[`+++quarkus.openid-ssf.receiver.allow-insecure-http+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.allow-insecure-http+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`+++quarkus.openid-ssf.receiver."transmitter-name".allow-insecure-http+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".allow-insecure-http+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+Whether the transmitter issuer and the endpoints it publishes may use plain `http` on hosts other than loopback addresses. For test setups only, SSF requires `https`: the metadata of the transmitter decides where keys come from, and without TLS anyone on the path can change it.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_ALLOW_INSECURE_HTTP+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_ALLOW_INSECURE_HTTP+++`
+endif::add-copy-button-to-env-var[]
+--
+|boolean
+|`+++false+++`
 
 a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-expected-audience]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-expected-audience[`+++quarkus.openid-ssf.receiver.expected-audience+++`]##
 ifdef::add-copy-button-to-config-props[]
@@ -59,9 +144,14 @@ config_property_copy_button:+++quarkus.openid-ssf.receiver.expected-audience+++[
 endif::add-copy-button-to-config-props[]
 
 
+`+++quarkus.openid-ssf.receiver."transmitter-name".expected-audience+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".expected-audience+++[]
+endif::add-copy-button-to-config-props[]
+
 [.description]
 --
-Expected `aud` value on inbound SETs. If set, the SET must contain a matching audience entry — otherwise it is rejected with 400. If absent, no audience check is performed.
+Audience this receiver is known as at the transmitter. When set, every inbound SET must contain it in its `aud` claim. When not set and the stream is looked up or registered at startup, the audience of the stream is expected instead.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -80,9 +170,14 @@ config_property_copy_button:+++quarkus.openid-ssf.receiver.stream-management+++[
 endif::add-copy-button-to-config-props[]
 
 
+`+++quarkus.openid-ssf.receiver."transmitter-name".stream-management+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".stream-management+++[]
+endif::add-copy-button-to-config-props[]
+
 [.description]
 --
-Who owns the stream lifecycle. `StreamManagement++#++RECEIVER` (the default) means the extension performs a discover-or-create on startup — see `ReceiverManaged` — and is the most common shape for SSF receivers in practice. `StreamManagement++#++TRANSMITTER` means the operator pre-creates the stream in the transmitter's admin console and pins the assigned `stream-id()` here.
+Who manages the stream. `RECEIVER` (the default): the extension looks the stream of this receiver up on startup and creates or updates it if necessary. `TRANSMITTER`: the stream is created at the transmitter and its identifier is pinned with `stream-id()`; without a stream id the receiver does not call the stream management API on startup at all.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -101,9 +196,14 @@ config_property_copy_button:+++quarkus.openid-ssf.receiver.stream-id+++[]
 endif::add-copy-button-to-config-props[]
 
 
+`+++quarkus.openid-ssf.receiver."transmitter-name".stream-id+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".stream-id+++[]
+endif::add-copy-button-to-config-props[]
+
 [.description]
 --
-Stream id pinned by the operator. Required when `stream-management()` is `StreamManagement++#++TRANSMITTER`; optional in `StreamManagement++#++RECEIVER` mode (if set, the registrar skips its discover-or-create step and uses this id directly).
+Identifier of a stream that was created at the transmitter. When set, the stream is looked up on startup to learn its audience and poll endpoint.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -122,9 +222,14 @@ config_property_copy_button:+++quarkus.openid-ssf.receiver.delivery-method+++[]
 endif::add-copy-button-to-config-props[]
 
 
+`+++quarkus.openid-ssf.receiver."transmitter-name".delivery-method+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".delivery-method+++[]
+endif::add-copy-button-to-config-props[]
+
 [.description]
 --
-How SETs are delivered. `DeliveryMethod++#++PUSH` (the default, RFC 8935) — the transmitter POSTs each SET to `Push++#++endpointPath()`. `DeliveryMethod++#++POLL` (RFC 8936) — the extension pulls SETs from the transmitter's poll endpoint; see `Poll`.
+How SETs are delivered. `PUSH` (the default, RFC 8935): the transmitter posts each SET to the push endpoint of this application. `POLL` (RFC 8936): the extension fetches SETs from the poll endpoint of the transmitter, see `poll()`.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -137,26 +242,57 @@ endif::add-copy-button-to-env-var[]
 a|`push`, `poll`
 |`+++push+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-endpoint-path]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-endpoint-path[`+++quarkus.openid-ssf.receiver.push.endpoint-path+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-events-requested]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-events-requested[`+++quarkus.openid-ssf.receiver.events-requested+++`]##
 ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.push.endpoint-path+++[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.events-requested+++[]
 endif::add-copy-button-to-config-props[]
 
 
+`+++quarkus.openid-ssf.receiver."transmitter-name".events-requested+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".events-requested+++[]
+endif::add-copy-button-to-config-props[]
+
 [.description]
 --
-Path of the push endpoint, relative to `quarkus.http.root-path`.
+Event types this receiver wants to subscribe to, as a full URI or an alias (the built-in `CaepSessionRevoked`, `RiscAccountDisabled`, ... or one of `event-aliases`). Required for a stream managed by the receiver, where it becomes `events_requested`; informational for a transmitter-managed one.
 
 
 ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_PUSH_ENDPOINT_PATH+++[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_EVENTS_REQUESTED+++[]
 endif::add-copy-button-to-env-var[]
 ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_PUSH_ENDPOINT_PATH+++`
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_EVENTS_REQUESTED+++`
+endif::add-copy-button-to-env-var[]
+--
+|list of string
+|
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-access-token]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-access-token[`+++quarkus.openid-ssf.receiver.transmitter-access-token+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.transmitter-access-token+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`+++quarkus.openid-ssf.receiver."transmitter-name".transmitter-access-token+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".transmitter-access-token+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+Static bearer access token to send on calls to the transmitter, for transmitters such as link:https://ssf.caep.dev[caep.dev] that hand out long-lived tokens out-of-band. Takes precedence over `oauth2()` and the OIDC client.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_TRANSMITTER_ACCESS_TOKEN+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_TRANSMITTER_ACCESS_TOKEN+++`
 endif::add-copy-button-to-env-var[]
 --
 |string
-|`+++/ssf/push+++`
+|
 
 a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-expected-auth-header]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-expected-auth-header[`+++quarkus.openid-ssf.receiver.push.expected-auth-header+++`]##
 ifdef::add-copy-button-to-config-props[]
@@ -164,9 +300,14 @@ config_property_copy_button:+++quarkus.openid-ssf.receiver.push.expected-auth-he
 endif::add-copy-button-to-config-props[]
 
 
+`+++quarkus.openid-ssf.receiver."transmitter-name".push.expected-auth-header+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".push.expected-auth-header+++[]
+endif::add-copy-button-to-config-props[]
+
 [.description]
 --
-If set, the push endpoint requires this exact value in the inbound `Authorization` header.
+Exact value the transmitter must send in the `Authorization` header, for example `Bearer s3cr3t`. No header check is performed when not set.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -185,9 +326,14 @@ config_property_copy_button:+++quarkus.openid-ssf.receiver.push.delivery-endpoin
 endif::add-copy-button-to-config-props[]
 
 
+`+++quarkus.openid-ssf.receiver."transmitter-name".push.delivery-endpoint-url+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".push.delivery-endpoint-url+++[]
+endif::add-copy-button-to-config-props[]
+
 [.description]
 --
-Externally-reachable URL of the push endpoint, advertised to the transmitter as `delivery.endpoint_url` in the create-stream request. Required when `stream-management=RECEIVER`; ignored otherwise.
+URL under which the transmitter reaches the push endpoint of this application, advertised as `delivery.endpoint_url` of a stream managed by the receiver. Required with `stream-management=RECEIVER` and PUSH delivery.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -206,9 +352,14 @@ config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.endpoint-url+++[
 endif::add-copy-button-to-config-props[]
 
 
+`+++quarkus.openid-ssf.receiver."transmitter-name".poll.endpoint-url+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".poll.endpoint-url+++[]
+endif::add-copy-button-to-config-props[]
+
 [.description]
 --
-Poll endpoint URL. Optional override; if absent, the extension reads it from the stream's `delivery.endpoint_url` via the `configuration_endpoint` on startup. Per RFC 8936, this URL is advertised by the transmitter — receivers normally don't pin it.
+Poll endpoint of the transmitter. Taken from the configuration of the stream when not set, which needs the stream to be looked up or managed on startup.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -227,9 +378,14 @@ config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.auto-start+++[]
 endif::add-copy-button-to-config-props[]
 
 
+`+++quarkus.openid-ssf.receiver."transmitter-name".poll.auto-start+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".poll.auto-start+++[]
+endif::add-copy-button-to-config-props[]
+
 [.description]
 --
-If `true` (the default), the poller schedules a periodic Vert.x timer on startup. Set to `false` to keep the poller idle — application code drives polling explicitly via `SsfPoller.pollNow()` (e.g. behind a REST endpoint, a scheduled job, or a Kafka consumer trigger).
+Whether the transmitter is polled periodically. Set to `false` to drive polling from application code with `SsfPollScheduler.pollNow()`.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -248,9 +404,14 @@ config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.start-delay+++[]
 endif::add-copy-button-to-config-props[]
 
 
+`+++quarkus.openid-ssf.receiver."transmitter-name".poll.start-delay+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".poll.start-delay+++[]
+endif::add-copy-button-to-config-props[]
+
 [.description]
 --
-Delay before the first poll fires after startup. Useful when other components need to warm up first (DB pool, config server, …). Defaults to `0s` — poll immediately.
+Time to wait before the first poll after startup.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -269,9 +430,14 @@ config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.interval+++[]
 endif::add-copy-button-to-config-props[]
 
 
+`+++quarkus.openid-ssf.receiver."transmitter-name".poll.interval+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".poll.interval+++[]
+endif::add-copy-button-to-config-props[]
+
 [.description]
 --
-How often to poll the transmitter. Defaults to 30s.
+Time between two polls.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -290,9 +456,14 @@ config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.max-events+++[]
 endif::add-copy-button-to-config-props[]
 
 
+`+++quarkus.openid-ssf.receiver."transmitter-name".poll.max-events+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".poll.max-events+++[]
+endif::add-copy-button-to-config-props[]
+
 [.description]
 --
-`maxEvents` parameter sent on each poll request (RFC 8936 §2.1). Defaults to 100.
+Maximum number of SETs to fetch with one request (`maxEvents`, RFC 8936).
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -305,78 +476,20 @@ endif::add-copy-button-to-env-var[]
 |int
 |`+++100+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-return-immediately]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-return-immediately[`+++quarkus.openid-ssf.receiver.poll.return-immediately+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.return-immediately+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-`returnImmediately` parameter (RFC 8936 §2.1). When `false`, the transmitter holds the request open until events are available (long-poll). Defaults to `true`.
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_POLL_RETURN_IMMEDIATELY+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_POLL_RETURN_IMMEDIATELY+++`
-endif::add-copy-button-to-env-var[]
---
-|boolean
-|`+++true+++`
-
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-drain-on-poll]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-drain-on-poll[`+++quarkus.openid-ssf.receiver.poll.drain-on-poll+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.drain-on-poll+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-If `true` and the transmitter sets `moreAvailable=true`, keep polling synchronously until the queue drains rather than waiting for the next periodic tick. Defaults to `true`.
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_POLL_DRAIN_ON_POLL+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_POLL_DRAIN_ON_POLL+++`
-endif::add-copy-button-to-env-var[]
---
-|boolean
-|`+++true+++`
-
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-timeout]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-timeout[`+++quarkus.openid-ssf.receiver.poll.timeout+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.timeout+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-Connect/read timeout for outbound poll requests. Defaults to 30s.
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_POLL_TIMEOUT+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_POLL_TIMEOUT+++`
-endif::add-copy-button-to-env-var[]
---
-|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
-|`+++30S+++`
-
 a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-rate-limit-fallback-backoff]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-rate-limit-fallback-backoff[`+++quarkus.openid-ssf.receiver.poll.rate-limit.fallback-backoff+++`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.rate-limit.fallback-backoff+++[]
 endif::add-copy-button-to-config-props[]
 
 
+`+++quarkus.openid-ssf.receiver."transmitter-name".poll.rate-limit.fallback-backoff+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".poll.rate-limit.fallback-backoff+++[]
+endif::add-copy-button-to-config-props[]
+
 [.description]
 --
-Backoff applied when the transmitter answers `429` _without_ a `Retry-After` header. If absent (the default), the poller waits one `poll.interval` before contacting the transmitter again.
+Pause after a `429` without a `Retry-After` header. Not set: poll again at the regular interval.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -395,9 +508,14 @@ config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.rate-limit.max-b
 endif::add-copy-button-to-config-props[]
 
 
+`+++quarkus.openid-ssf.receiver."transmitter-name".poll.rate-limit.max-backoff+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".poll.rate-limit.max-backoff+++[]
+endif::add-copy-button-to-config-props[]
+
 [.description]
 --
-Upper bound for any rate-limit backoff, whether it comes from a `Retry-After` header or from `fallback-backoff`. Protects the receiver from a transmitter that asks it to stay away for hours. Defaults to `5m`.
+Longest pause a `Retry-After` header or `fallback-backoff` can cause. Protects the receiver from a transmitter that asks it to stay away for hours.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -410,38 +528,20 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
 |`+++5M+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-receiver-managed-register-stream]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-receiver-managed-register-stream[`+++quarkus.openid-ssf.receiver.receiver-managed.register-stream+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.receiver-managed.register-stream+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-If `true`, the extension performs a discover-or-create dance on app startup: it lists the receiver's existing streams on the transmitter (§7.1.1.2 with no `stream_id`), reuses one whose `delivery.endpoint_url` (or audience) matches this receiver, and creates a new stream if none matches. Defaults to `true`.
-
-Set to `false` to manage stream lifecycle entirely from application code (e.g. via `SsfStreamClient.createStream`).
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_RECEIVER_MANAGED_REGISTER_STREAM+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_RECEIVER_MANAGED_REGISTER_STREAM+++`
-endif::add-copy-button-to-env-var[]
---
-|boolean
-|`+++true+++`
-
 a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-receiver-managed-delete-on-shutdown]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-receiver-managed-delete-on-shutdown[`+++quarkus.openid-ssf.receiver.receiver-managed.delete-on-shutdown+++`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.receiver-managed.delete-on-shutdown+++[]
 endif::add-copy-button-to-config-props[]
 
 
+`+++quarkus.openid-ssf.receiver."transmitter-name".receiver-managed.delete-on-shutdown+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".receiver-managed.delete-on-shutdown+++[]
+endif::add-copy-button-to-config-props[]
+
 [.description]
 --
-If `true`, the extension issues a stream-delete call against the transmitter on app shutdown so the transmitter doesn't accumulate stale stream registrations from short-lived receivers (dev mode, tests, …). Defaults to `false` so a normal restart keeps the existing stream.
+Whether the stream managed by the receiver is deleted at the transmitter when the application stops, so that short-lived receivers (dev mode, tests) do not leave streams behind. `false` keeps the stream across restarts.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -460,9 +560,14 @@ config_property_copy_button:+++quarkus.openid-ssf.receiver.receiver-managed.desc
 endif::add-copy-button-to-config-props[]
 
 
+`+++quarkus.openid-ssf.receiver."transmitter-name".receiver-managed.description+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".receiver-managed.description+++[]
+endif::add-copy-button-to-config-props[]
+
 [.description]
 --
-Optional human-readable description sent in the create-stream request.
+Description of the stream managed by the receiver.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -470,6 +575,458 @@ Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_RE
 endif::add-copy-button-to-env-var[]
 ifndef::add-copy-button-to-env-var[]
 Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_RECEIVER_MANAGED_DESCRIPTION+++`
+endif::add-copy-button-to-env-var[]
+--
+|string
+|
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-accepted-algorithms]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-accepted-algorithms[`+++quarkus.openid-ssf.receiver.set-validation.accepted-algorithms+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.set-validation.accepted-algorithms+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.accepted-algorithms+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.accepted-algorithms+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+JWS algorithms accepted for SET signatures. Only asymmetric signature algorithms are allowed. A SET signed with another algorithm is rejected.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_SET_VALIDATION_ACCEPTED_ALGORITHMS+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_SET_VALIDATION_ACCEPTED_ALGORITHMS+++`
+endif::add-copy-button-to-env-var[]
+--
+|list of string
+|`+++RS256+++`
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-min-rsa-key-size]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-min-rsa-key-size[`+++quarkus.openid-ssf.receiver.set-validation.min-rsa-key-size+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.set-validation.min-rsa-key-size+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.min-rsa-key-size+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.min-rsa-key-size+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+Minimum RSA key size in bits for SET signing keys. `0` disables the check.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_SET_VALIDATION_MIN_RSA_KEY_SIZE+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_SET_VALIDATION_MIN_RSA_KEY_SIZE+++`
+endif::add-copy-button-to-env-var[]
+--
+|int
+|`+++2048+++`
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-require-type-header]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-require-type-header[`+++quarkus.openid-ssf.receiver.set-validation.require-type-header+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.set-validation.require-type-header+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.require-type-header+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.require-type-header+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+Whether a SET must be explicitly typed with a `typ` header of `secevent{plus}jwt`.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_SET_VALIDATION_REQUIRE_TYPE_HEADER+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_SET_VALIDATION_REQUIRE_TYPE_HEADER+++`
+endif::add-copy-button-to-env-var[]
+--
+|boolean
+|`+++true+++`
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-clock-skew]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-clock-skew[`+++quarkus.openid-ssf.receiver.set-validation.clock-skew+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.set-validation.clock-skew+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.clock-skew+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.clock-skew+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+Tolerated clock skew when checking that a SET was not issued in the future.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_SET_VALIDATION_CLOCK_SKEW+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_SET_VALIDATION_CLOCK_SKEW+++`
+endif::add-copy-button-to-env-var[]
+--
+|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
+|`+++60S+++`
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-token-endpoint]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-token-endpoint[`+++quarkus.openid-ssf.receiver.oauth2.token-endpoint+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.token-endpoint+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.token-endpoint+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.token-endpoint+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+Token endpoint to obtain access tokens from with the client credentials grant. Setting it activates this provider.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_TOKEN_ENDPOINT+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_TOKEN_ENDPOINT+++`
+endif::add-copy-button-to-env-var[]
+--
+|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/net/URI.html[URI]
+|
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-id]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-id[`+++quarkus.openid-ssf.receiver.oauth2.client-id+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.client-id+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.client-id+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.client-id+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+Client id of this receiver.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_CLIENT_ID+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_CLIENT_ID+++`
+endif::add-copy-button-to-env-var[]
+--
+|string
+|
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-secret]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-secret[`+++quarkus.openid-ssf.receiver.oauth2.client-secret+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.client-secret+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.client-secret+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.client-secret+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+Client secret of this receiver.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_CLIENT_SECRET+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_CLIENT_SECRET+++`
+endif::add-copy-button-to-env-var[]
+--
+|string
+|
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-scopes]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-scopes[`+++quarkus.openid-ssf.receiver.oauth2.scopes+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.scopes+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.scopes+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.scopes+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+Scopes to request, sent space-separated in the `scope` parameter.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_SCOPES+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_SCOPES+++`
+endif::add-copy-button-to-env-var[]
+--
+|list of string
+|
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-auth-method]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-auth-method[`+++quarkus.openid-ssf.receiver.oauth2.client-auth-method+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.client-auth-method+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.client-auth-method+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.client-auth-method+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+How the client authenticates at the token endpoint: `basic` (`client_secret_basic`, the default) or `post` (`client_secret_post`, credentials in the form body).
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_CLIENT_AUTH_METHOD+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_CLIENT_AUTH_METHOD+++`
+endif::add-copy-button-to-env-var[]
+--
+a|`basic`, `post`
+|`+++basic+++`
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-additional-params-parameter]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-additional-params-parameter[`+++quarkus.openid-ssf.receiver.oauth2.additional-params."parameter"+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.additional-params."parameter"+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.additional-params."parameter"+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.additional-params."parameter"+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+Form parameters to send with the token request in addition to the grant, for extensions of the token endpoint.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_ADDITIONAL_PARAMS__PARAMETER_+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_ADDITIONAL_PARAMS__PARAMETER_+++`
+endif::add-copy-button-to-env-var[]
+--
+|Map<String,String>
+|
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-expiry-safety-window]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-expiry-safety-window[`+++quarkus.openid-ssf.receiver.oauth2.expiry-safety-window+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.expiry-safety-window+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.expiry-safety-window+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.expiry-safety-window+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+How long before its expiry an access token is renewed; never more than a quarter of the token's lifetime.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_EXPIRY_SAFETY_WINDOW+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_EXPIRY_SAFETY_WINDOW+++`
+endif::add-copy-button-to-env-var[]
+--
+|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
+|`+++30S+++`
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oidc-client-name]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oidc-client-name[`+++quarkus.openid-ssf.receiver.oidc.client-name+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.oidc.client-name+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`+++quarkus.openid-ssf.receiver."transmitter-name".oidc.client-name+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oidc.client-name+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+Name of the OIDC client (`quarkus.oidc-client.<name>.++*++`) to obtain access tokens from. The default client (`quarkus.oidc-client.++*++`) when not set.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OIDC_CLIENT_NAME+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OIDC_CLIENT_NAME+++`
+endif::add-copy-button-to-env-var[]
+--
+|string
+|
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oidc-token-timeout]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oidc-token-timeout[`+++quarkus.openid-ssf.receiver.oidc.token-timeout+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.oidc.token-timeout+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`+++quarkus.openid-ssf.receiver."transmitter-name".oidc.token-timeout+++`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oidc.token-timeout+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+Maximum time to wait for an access token from the OIDC client.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OIDC_TOKEN_TIMEOUT+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OIDC_TOKEN_TIMEOUT+++`
+endif::add-copy-button-to-env-var[]
+--
+|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
+|`+++2S+++`
+
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-event-aliases-alias]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-event-aliases-alias[`+++quarkus.openid-ssf.receiver.event-aliases."alias"+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.event-aliases."alias"+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+Aliases for event type URIs, usable wherever an event type is named: in `events-requested`, in handlers (`eventContext.hasEvent("AcmeLogin")`) and as the `event` tag of the metrics. Keyed by alias, valued by URI:
+
+```
+quarkus.openid-ssf.receiver.event-aliases.AcmeLogin=https://events.acme.example/login
+```
+
+
+
+They add to the built-in aliases of the SSF, CAEP and RISC event types (for example `CaepSessionRevoked`, `RiscAccountDisabled`) and cannot redefine one; a conflicting alias fails the start.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_EVENT_ALIASES__ALIAS_+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_EVENT_ALIASES__ALIAS_+++`
+endif::add-copy-button-to-env-var[]
+--
+|Map<String,String>
+|
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-endpoint-path]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-endpoint-path[`+++quarkus.openid-ssf.receiver.push.endpoint-path+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.push.endpoint-path+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+Path of the push endpoint, relative to `quarkus.http.root-path`. The transmitters with `delivery-method=PUSH` post their SETs there; which transmitter sent a SET is told by its issuer.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_PUSH_ENDPOINT_PATH+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_PUSH_ENDPOINT_PATH+++`
+endif::add-copy-button-to-env-var[]
+--
+|string
+|`+++/ssf/push+++`
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-connect-timeout]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-connect-timeout[`+++quarkus.openid-ssf.receiver.http.connect-timeout+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.http.connect-timeout+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+Connect timeout for calls to the transmitters.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_HTTP_CONNECT_TIMEOUT+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_HTTP_CONNECT_TIMEOUT+++`
+endif::add-copy-button-to-env-var[]
+--
+|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
+|`+++5S+++`
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-read-timeout]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-read-timeout[`+++quarkus.openid-ssf.receiver.http.read-timeout+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.http.read-timeout+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+Read timeout for calls to the transmitters: how long to wait for the response to a metadata, JWK Set, stream management, token or poll request.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_HTTP_READ_TIMEOUT+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_HTTP_READ_TIMEOUT+++`
+endif::add-copy-button-to-env-var[]
+--
+|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
+|`+++5S+++`
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-user-agent]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-user-agent[`+++quarkus.openid-ssf.receiver.http.user-agent+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.http.user-agent+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+`User-Agent` header for calls to the transmitters. The default of the JDK HTTP client (`Java-http-client/<version>`) is sent when not set.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_HTTP_USER_AGENT+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_HTTP_USER_AGENT+++`
 endif::add-copy-button-to-env-var[]
 --
 |string
@@ -483,9 +1040,7 @@ endif::add-copy-button-to-config-props[]
 
 [.description]
 --
-Master switch for the `jti` dedup layer. When `true` (the default), the extension consults `SsfJtiDedupStore.seenBefore(jti)` before invoking the application's `SsfEventHandler` on both PUSH and POLL paths; duplicates are silently dropped (still `202` on PUSH, still acked on POLL — the SET was successfully received).
-
-Set to `false` when the application's handler is naturally idempotent (e.g. natural-key upsert into a database) and the extra lookup is wasted work.
+Whether SETs that were already processed are skipped. A SET that was processed before is acknowledged (`202` on PUSH, acknowledged on POLL) without invoking the handlers again. Set to `false` when the handlers are idempotent anyway.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -506,9 +1061,7 @@ endif::add-copy-button-to-config-props[]
 
 [.description]
 --
-Capacity of the default in-memory dedup store. Overflow evicts the oldest jti. Tune to roughly cover the longest expected redelivery window — defaults to `10_000`, which on a typical SSF stream (a few events per second peak) is several minutes of memory.
-
-Ignored by custom `SsfJtiDedupStore` implementations.
+Number of SET identifiers the in-memory store remembers. Overflow evicts the oldest. Ignored by a JDBC store or a custom `SsfJtiDedupStore` bean.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -521,467 +1074,110 @@ endif::add-copy-button-to-env-var[]
 |int
 |`+++10000+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-accepted-algorithms]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-accepted-algorithms[`+++quarkus.openid-ssf.receiver.set-validation.accepted-algorithms+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-retention]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-retention[`+++quarkus.openid-ssf.receiver.dedup.retention+++`]##
 ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.set-validation.accepted-algorithms+++[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.dedup.retention+++[]
 endif::add-copy-button-to-config-props[]
 
 
 [.description]
 --
-Allowed JWS `alg` values on inbound SETs. Any SET whose header advertises an algorithm outside this list is rejected before signature verification — defense against alg-substitution attacks. Default is `++[++RS256++]++` (CAEP Interop §3.1).
+How long the JDBC store remembers a processed SET. Has to cover the time the transmitter keeps trying to deliver a SET.
 
 
 ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_SET_VALIDATION_ACCEPTED_ALGORITHMS+++[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_DEDUP_RETENTION+++[]
 endif::add-copy-button-to-env-var[]
 ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_SET_VALIDATION_ACCEPTED_ALGORITHMS+++`
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_DEDUP_RETENTION+++`
 endif::add-copy-button-to-env-var[]
 --
-|list of string
-|`+++RS256+++`
+|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
+|`+++7D+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-min-rsa-key-size]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-min-rsa-key-size[`+++quarkus.openid-ssf.receiver.set-validation.min-rsa-key-size+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-enabled]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-enabled[`+++quarkus.openid-ssf.receiver.jdbc.enabled+++`]##
 ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.set-validation.min-rsa-key-size+++[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.jdbc.enabled+++[]
 endif::add-copy-button-to-config-props[]
 
 
 [.description]
 --
-Minimum RSA key size, in bits, accepted for SET signature verification. SETs signed with an RSA JWK whose modulus is shorter than this are rejected. Default is `2048` (CAEP Interop §3.1). Set to `0` to disable the check (not recommended).
+Whether processed SETs are remembered in the default datasource of the application, if it has one (`quarkus-agroal`), so that all instances of the application share them and they survive a restart. Otherwise they are kept in memory.
 
 
 ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_SET_VALIDATION_MIN_RSA_KEY_SIZE+++[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_JDBC_ENABLED+++[]
 endif::add-copy-button-to-env-var[]
 ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_SET_VALIDATION_MIN_RSA_KEY_SIZE+++`
-endif::add-copy-button-to-env-var[]
---
-|int
-|`+++2048+++`
-
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-managed-probe-on-startup]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-managed-probe-on-startup[`+++quarkus.openid-ssf.receiver.transmitter-managed.probe-on-startup+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.transmitter-managed.probe-on-startup+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-If `true` (the default), on startup the extension fetches the configured stream's configuration and status from the transmitter and logs a one-line summary — useful for confirming the stream exists and is enabled. Probe failures are warnings, never fatal.
-
-Set to `false` when the receiver doesn't have outbound credentials configured (push-only with public JWKS), or to keep boot silent.
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_TRANSMITTER_MANAGED_PROBE_ON_STARTUP+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_TRANSMITTER_MANAGED_PROBE_ON_STARTUP+++`
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_JDBC_ENABLED+++`
 endif::add-copy-button-to-env-var[]
 --
 |boolean
 |`+++true+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-metadata-url]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-metadata-url[`+++quarkus.openid-ssf.receiver.transmitter-metadata-url+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-initialize-schema]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-initialize-schema[`+++quarkus.openid-ssf.receiver.jdbc.initialize-schema+++`]##
 ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.transmitter-metadata-url+++[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.jdbc.initialize-schema+++[]
 endif::add-copy-button-to-config-props[]
 
 
 [.description]
 --
-Explicit URL of the transmitter's SSF metadata document.
-
-If unset, the URL is derived from `transmitter-issuer()` per SSF spec §7.2 — `/.well-known/ssf-configuration` is inserted _between the host and the path_ of the issuer (NOT appended to the end). For example:
-
- - Issuer `https://tr.example.com` → metadata at `https://tr.example.com/.well-known/ssf-configuration`
- - Issuer `https://tr.example.com/realms/r1` → metadata at `https://tr.example.com/.well-known/ssf-configuration/realms/r1`
-
-
-
-Set this property explicitly when the transmitter doesn't follow the SSF rule — for example, OIDC-derived transmitters that serve the document at the OIDC-style appended path (`<issuer>/.well-known/ssf-configuration`) instead.
+Whether the table is created at startup if it does not exist. With `false` the table has to be created with the statements in `classpath:org/easyssf/receiver/jdbc/schema.sql`, for example by a schema migration, and the start fails if it is missing.
 
 
 ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_TRANSMITTER_METADATA_URL+++[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_JDBC_INITIALIZE_SCHEMA+++[]
 endif::add-copy-button-to-env-var[]
 ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_TRANSMITTER_METADATA_URL+++`
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_JDBC_INITIALIZE_SCHEMA+++`
 endif::add-copy-button-to-env-var[]
 --
-|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/net/URI.html[URI]
-|
+|boolean
+|`+++true+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-jwks-url]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-jwks-url[`+++quarkus.openid-ssf.receiver.transmitter-jwks-url+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-table-prefix]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-table-prefix[`+++quarkus.openid-ssf.receiver.jdbc.table-prefix+++`]##
 ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.transmitter-jwks-url+++[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.jdbc.table-prefix+++[]
 endif::add-copy-button-to-config-props[]
 
 
 [.description]
 --
-JWKS URL of the transmitter. Defaults to the `jwks_uri` advertised in transmitter metadata.
+Prefix of the names of the tables.
 
 
 ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_TRANSMITTER_JWKS_URL+++[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_JDBC_TABLE_PREFIX+++[]
 endif::add-copy-button-to-env-var[]
 ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_TRANSMITTER_JWKS_URL+++`
-endif::add-copy-button-to-env-var[]
---
-|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/net/URI.html[URI]
-|
-
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-access-token]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-access-token[`+++quarkus.openid-ssf.receiver.transmitter-access-token+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.transmitter-access-token+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-Static bearer access token to send on outbound calls to the transmitter. If set, the deployment processor registers a `StaticTransmitterTokenProvider` _instead of_ the OIDC-backed one — useful for transmitters such as link:https://ssf.caep.dev[caep.dev] that issue long-lived bearer tokens out-of-band rather than via an OAuth grant. Mutually exclusive with `quarkus-oidc-client`; when both are configured this token wins.
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_TRANSMITTER_ACCESS_TOKEN+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_TRANSMITTER_ACCESS_TOKEN+++`
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_JDBC_TABLE_PREFIX+++`
 endif::add-copy-button-to-env-var[]
 --
 |string
-|
+|`+++EASYSSF_+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-events-requested]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-events-requested[`+++quarkus.openid-ssf.receiver.events-requested+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-cleanup-interval]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-cleanup-interval[`+++quarkus.openid-ssf.receiver.jdbc.cleanup-interval+++`]##
 ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.events-requested+++[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.jdbc.cleanup-interval+++[]
 endif::add-copy-button-to-config-props[]
 
 
 [.description]
 --
-Event types this receiver wants to subscribe to. Required when `stream-management()` is `StreamManagement++#++RECEIVER` (sent in the `events_requested` field of the create-stream request). Informational for transmitter-managed streams — the transmitter (e.g. Keycloak admin) already controls the actual subscription set.
-
-Each entry can be a full URI (e.g. `https://schemas.openid.net/secevent/caep/event-type/session-revoked`) or a short alias registered with `event-aliases() event-aliases` — including the SSF / CAEP / RISC built-ins (e.g. `CaepSessionRevoked`, `RiscAccountDisabled`). Resolution is performed by `io.quarkiverse.ssf.receiver.runtime.event.SsfAliases++#++resolveEventTypeRef(String)` at startup; an unregistered name fails fast with a list of available aliases.
-
-Example:
-
-```
-quarkus.openid-ssf.receiver.events-requested=CaepSessionRevoked,CaepCredentialChange,\
-    https://schemas.example.org/vendor/event-type/x
-```
+How often expired rows (processed SETs past `dedup.retention`) are purged. The store also purges when it is written to; `0` turns the periodic cleanup off.
 
 
 ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_EVENTS_REQUESTED+++[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_JDBC_CLEANUP_INTERVAL+++[]
 endif::add-copy-button-to-env-var[]
 ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_EVENTS_REQUESTED+++`
-endif::add-copy-button-to-env-var[]
---
-|list of string
-|
-
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-event-aliases-event-aliases]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-event-aliases-event-aliases[`+++quarkus.openid-ssf.receiver.event-aliases."event-aliases"+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.event-aliases."event-aliases"+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-Short aliases for event-type URIs — used as the `event` tag value on the `ssf.receiver.events.processed` meter and as accepted input to `events-requested()`. Keyed by alias, valued by URI:
-
-```
-quarkus.openid-ssf.receiver.event-aliases.VendorWidgetReplaced=https://schemas.example.org/vendor/event-type/widget-replaced
-```
-
-
-
-Built-in aliases for the OpenID SSF, CAEP 1.0, and RISC 1.0 spec event types are always registered out of the box (e.g. `SsfStreamVerification`, `CaepSessionRevoked`, `RiscAccountDisabled`, …); user entries with the same URI override the built-in alias name. Unknown URIs fall back to the URI itself as the tag value.
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_EVENT_ALIASES__EVENT_ALIASES_+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_EVENT_ALIASES__EVENT_ALIASES_+++`
-endif::add-copy-button-to-env-var[]
---
-|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/net/URI.html[Map<String,URI>]
-|
-
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-issuer-aliases-issuer-aliases]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-issuer-aliases-issuer-aliases[`+++quarkus.openid-ssf.receiver.issuer-aliases."issuer-aliases"+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.issuer-aliases."issuer-aliases"+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-Short aliases for transmitter issuer URLs — used as the `iss` tag value on the `ssf.receiver.events.processed` meter. Keyed by alias, valued by issuer URL:
-
-```
-quarkus.openid-ssf.receiver.issuer-aliases.KeycloakSsfPoc=https://id.localhost/realms/ssf-poc
-  quarkus.openid-ssf.receiver.issuer-aliases.CaepDev=https://ssf.caep.dev
-```
-
-
-
-No built-in defaults — issuer URLs are deployment-specific. Unknown URLs fall back to the URL itself as the tag value.
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_ISSUER_ALIASES__ISSUER_ALIASES_+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_ISSUER_ALIASES__ISSUER_ALIASES_+++`
-endif::add-copy-button-to-env-var[]
---
-|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/net/URI.html[Map<String,URI>]
-|
-
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-alias]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-alias[`+++quarkus.openid-ssf.receiver.alias+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.alias+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-Short, stable name for _this_ receiver — surfaced as the `receiver` tag on the `ssf.receiver.events.processed` meter so multiple receiver instances scraping into the same monitoring store stay distinguishable.
-
-Falls back to `expected-audience()` if unset, then to `"unknown"`.
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_ALIAS+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_ALIAS+++`
-endif::add-copy-button-to-env-var[]
---
-|string
-|
-
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-token-endpoint]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-token-endpoint[`+++quarkus.openid-ssf.receiver.oauth2.token-endpoint+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.token-endpoint+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-Token endpoint URL where the OAuth2 grant is exchanged. Setting this activates the OAuth2 provider; leaving it empty falls through to the OIDC / no-op providers.
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_TOKEN_ENDPOINT+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_TOKEN_ENDPOINT+++`
-endif::add-copy-button-to-env-var[]
---
-|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/net/URI.html[URI]
-|
-
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-grant-type]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-grant-type[`+++quarkus.openid-ssf.receiver.oauth2.grant-type+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.grant-type+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-OAuth2 grant type sent in the `grant_type` form parameter. Default is `client_credentials` (RFC 6749 §4.4) — the only grant the receiver needs for outbound transmitter calls. Override for non-standard or extension grants (e.g. `urn:ietf:params:oauth:grant-type:jwt-bearer`).
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_GRANT_TYPE+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_GRANT_TYPE+++`
-endif::add-copy-button-to-env-var[]
---
-|string
-|`+++client_credentials+++`
-
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-auth-method]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-auth-method[`+++quarkus.openid-ssf.receiver.oauth2.client-auth-method+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.client-auth-method+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-Which client-authentication method to use when sending the `client-id()` / `client-secret()` pair. RFC 6749 §2.3.1 defines two:
-
- - `basic` — HTTP Basic header (`Authorization: Basic base64(client_id:client_secret)`). RECOMMENDED by the spec and the default here.
- - `post` — credentials in the form body (`client_id=…&client_secret=…`). Some servers (notably caep.dev and various older IdPs) only accept this form.
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_CLIENT_AUTH_METHOD+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_CLIENT_AUTH_METHOD+++`
-endif::add-copy-button-to-env-var[]
---
-a|`basic`, `post`
-|`+++basic+++`
-
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-id]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-id[`+++quarkus.openid-ssf.receiver.oauth2.client-id+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.client-id+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-OAuth2 client identifier. Sent in the `client_id` form parameter when `client-auth-method()` is `post`, or as the basic-auth username when `basic`.
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_CLIENT_ID+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_CLIENT_ID+++`
-endif::add-copy-button-to-env-var[]
---
-|string
-|
-
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-secret]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-secret[`+++quarkus.openid-ssf.receiver.oauth2.client-secret+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.client-secret+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-OAuth2 client secret. Sent in the `client_secret` form parameter when `client-auth-method()` is `post`, or as the basic-auth password when `basic`.
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_CLIENT_SECRET+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_CLIENT_SECRET+++`
-endif::add-copy-button-to-env-var[]
---
-|string
-|
-
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-scopes]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-scopes[`+++quarkus.openid-ssf.receiver.oauth2.scopes+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.scopes+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-Optional space-separated `scope` request parameter. List form in config (e.g. `quarkus.openid-ssf.receiver.oauth2.scopes=ssf.read,ssf.manage`); the values are joined with single spaces on the wire.
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_SCOPES+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_SCOPES+++`
-endif::add-copy-button-to-env-var[]
---
-|list of string
-|
-
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-additional-params-additional-params]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-additional-params-additional-params[`+++quarkus.openid-ssf.receiver.oauth2.additional-params."additional-params"+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.additional-params."additional-params"+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-Extra form parameters appended verbatim to the token-endpoint POST. Escape hatch for server-specific extensions (e.g. `resource=` on Microsoft Entra, vendor-specific tenant identifiers, etc.).
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_ADDITIONAL_PARAMS__ADDITIONAL_PARAMS_+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_ADDITIONAL_PARAMS__ADDITIONAL_PARAMS_+++`
-endif::add-copy-button-to-env-var[]
---
-|Map<String,String>
-|
-
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-expiry-safety-window]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-expiry-safety-window[`+++quarkus.openid-ssf.receiver.oauth2.expiry-safety-window+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.expiry-safety-window+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-Subtracted from the token endpoint's reported `expires_in` before the provider treats a cached token as expired. Default is 30s, which covers typical clock skew {plus} the duration of the outbound call the token is about to authenticate.
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_EXPIRY_SAFETY_WINDOW+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_EXPIRY_SAFETY_WINDOW+++`
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_JDBC_CLEANUP_INTERVAL+++`
 endif::add-copy-button-to-env-var[]
 --
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
-|`+++30S+++`
-
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-timeout]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-timeout[`+++quarkus.openid-ssf.receiver.oauth2.timeout+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.timeout+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-Connect / read timeout for the token endpoint POST. Default is 5s.
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_TIMEOUT+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OAUTH2_TIMEOUT+++`
-endif::add-copy-button-to-env-var[]
---
-|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
-|`+++5S+++`
-
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oidc-token-timeout]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oidc-token-timeout[`+++quarkus.openid-ssf.receiver.oidc.token-timeout+++`]##
-ifdef::add-copy-button-to-config-props[]
-config_property_copy_button:+++quarkus.openid-ssf.receiver.oidc.token-timeout+++[]
-endif::add-copy-button-to-config-props[]
-
-
-[.description]
---
-Maximum time to wait when fetching an access token from `OidcClient.getTokens()` for outbound calls to the transmitter. Bounds the `Uni.await().atMost(...)` on the call site so a slow / unresponsive OIDC token endpoint doesn't stall a Vert.x event loop indefinitely. Defaults to 2s.
-
-
-ifdef::add-copy-button-to-env-var[]
-Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_OIDC_TOKEN_TIMEOUT+++[]
-endif::add-copy-button-to-env-var[]
-ifndef::add-copy-button-to-env-var[]
-Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_OIDC_TOKEN_TIMEOUT+++`
-endif::add-copy-button-to-env-var[]
---
-|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
-|`+++2S+++`
+|`+++15M+++`
 
 |===
 

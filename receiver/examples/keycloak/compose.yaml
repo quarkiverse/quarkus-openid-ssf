@@ -1,0 +1,48 @@
+# Keycloak as identity provider and SSF transmitter for the example applications
+# (example-resource-server and example-oidc-client). The same setup as the one of
+# the easyssf Spring Boot examples.
+#
+#   docker compose up
+#
+# Admin console: http://localhost:8080 (admin / admin), realm 'ssf-demo'
+#
+# The database lives in ./data and survives 'docker compose down'. The realm is only imported into an
+# empty database: to re-import ssf-demo-realm.json, stop Keycloak and delete ./data.
+
+# explicit project name: by default it is the name of this folder ('keycloak'),
+# which collides with any other compose project that lives in a folder of that name
+name: quarkus-openid-ssf-examples
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.0
+    command:
+      - start-dev
+      # SSF is an experimental feature of Keycloak
+      - --features=ssf
+      - --import-realm
+      # the example applications are reached via plain http on the docker host,
+      # which Keycloak does not accept as push target by default
+      - --spi-ssf-transmitter--default--allow-insecure-push-targets=true
+      # deliver events within seconds, by default Keycloak pushes them every 30 seconds
+      - --spi-ssf-transmitter--default--outbox-drainer-interval=2s
+      # verbose logging for the SSF transmitter and its outbox, to follow stream management and SET delivery
+      - --log-level=INFO,org.keycloak.ssf:debug,org.keycloak.events.outbox:debug
+      # show login, logout and token request events in the log (by default only failed events are logged, at debug)
+      - --spi-events-listener--jboss-logging--success-level=info
+      - --spi-events-listener--jboss-logging--error-level=warn
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      # SETs are created outside of a request, the issuer must not depend on the request URL
+      KC_HOSTNAME: http://localhost:8080
+      JAVA_OPTS_APPEND: -Djava.net.preferIPv4Stack=true
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      # lets Keycloak push to the example applications running on the docker host (needed on Linux)
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./ssf-demo-realm.json:/opt/keycloak/data/import/ssf-demo-realm.json:ro
+      # dev-file database of 'start-dev', keeps realm changes, users, sessions and streams across runs
+      - ./data:/opt/keycloak/data/h2

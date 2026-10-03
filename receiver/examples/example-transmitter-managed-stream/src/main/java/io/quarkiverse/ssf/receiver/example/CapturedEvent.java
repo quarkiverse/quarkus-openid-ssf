@@ -5,20 +5,18 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import io.quarkiverse.ssf.receiver.runtime.event.SsfAliases;
-import io.quarkiverse.ssf.receiver.runtime.event.SsfEventToken;
+import org.easyssf.core.event.SsfEventToken;
+import org.easyssf.core.event.SsfEventTypes;
 
 /**
- * Demo-friendly snapshot of an inbound SET. Wraps the verified
- * {@link SsfEventToken} with:
+ * Demo-friendly snapshot of an inbound SET. Wraps the verified {@link SsfEventToken} with:
  * <ul>
- * <li>{@code capturedAt} — local wall-clock time when the receiver accepted
- * the SET, so the demo can show end-to-end latency vs the SET's {@code iat}.</li>
- * <li>{@code issAlias} — pre-resolved alias for the issuer URL.</li>
- * <li>{@code events} — the per-event-type payload map, keyed by the alias
- * (or the URI when no alias is configured). This is the same data the
- * SSF transmitter put in the SET's {@code events} claim, just keyed for
- * readability instead of by full URI.</li>
+ * <li>{@code capturedAt}: local wall-clock time when the receiver accepted the SET, so
+ * the demo can show end-to-end latency against the SET's {@code iat}.</li>
+ * <li>{@code transmitter}: the name of the transmitter the SET came from.</li>
+ * <li>{@code events}: the per-event-type payload map, keyed by the alias of the event
+ * type (or the URI when it has none). The same data the transmitter put in the SET's
+ * {@code events} claim, keyed for readability.</li>
  * </ul>
  *
  * <p>
@@ -27,7 +25,7 @@ import io.quarkiverse.ssf.receiver.runtime.event.SsfEventToken;
 public record CapturedEvent(
         Instant capturedAt,
         String jti,
-        String issAlias,
+        String transmitter,
         String iss,
         Instant iat,
         List<String> aud,
@@ -36,16 +34,14 @@ public record CapturedEvent(
         Map<String, Object> events,
         SsfEventToken raw) {
 
-    public static CapturedEvent of(SsfEventToken token, SsfAliases aliases) {
+    public static CapturedEvent of(SsfEventToken token, String transmitter) {
         Map<String, Object> events = new LinkedHashMap<>();
-        if (token.events() != null) {
-            // Preserve insertion order so the JSON keys match what the transmitter sent.
-            token.events().forEach((uri, payload) -> events.put(aliases.eventTypeAlias(uri), payload));
-        }
+        // Preserve insertion order so the JSON keys match what the transmitter sent.
+        token.events().forEach((uri, payload) -> events.put(SsfEventTypes.aliasOf(uri), payload));
         return new CapturedEvent(
                 Instant.now(),
                 token.jti(),
-                aliases.issuerAlias(token.iss()),
+                transmitter,
                 token.iss(),
                 token.iat(),
                 token.aud(),

@@ -22,16 +22,16 @@ swapping env vars.
 - Wrapping each captured `SsfEventToken` in a demo-friendly `CapturedEvent`
   record that surfaces the per-event-type **payload** keyed by alias rather
   than full URI — easier for screenshots / browser inspection.
-- Reading the live stream config + status via `SsfStreamClient`.
+- Reading the live stream config + status via `SsfReceiverStreamClient`.
 - Outbound auth via OIDC `client_credentials` (`quarkus-oidc-client`).
-- The startup probe confirming the stream exists and is enabled before the
-  receiver accepts any traffic.
+- The stream lookup on startup, which tells the audience the SETs have to
+  carry and logs the stream (`Using SSF stream …`).
 
 ### Endpoints (port `28080`)
 
 | | |
 |---|---|
-| `GET  /events/recent-events` | Last 50 captured events (alias-keyed payloads) |
+| `GET  /events/recent-events` | Last 50 captured events (alias-keyed `events`) |
 | `GET  /events/latest`        | Most recent capture only |
 | `GET  /streams/default`      | Live stream configuration from the transmitter |
 | `GET  /streams/default/status` | Live stream status |
@@ -114,7 +114,7 @@ curl -s localhost:28080/events/latest        | jq
 ```
 
 Each entry contains `jti`, `iss` (alias-resolved), `iat`, `aud`, `txn`,
-`subjectId`, the alias-keyed `payloads` map, and the raw `SsfEventToken`.
+`subjectId`, the alias-keyed `events` map, and the raw `SsfEventToken`.
 
 You can also force a round-trip without waiting for a real event:
 
@@ -148,11 +148,11 @@ exporting different env vars in the shell that runs that example.
 scrapable at `http://localhost:28080/q/metrics`. Filter for the SSF series:
 
 ```sh
-curl -s localhost:28080/q/metrics | grep ^ssf_receiver_
+curl -s localhost:28080/q/metrics | grep ^easyssf_receiver_
 ```
 
-The `event-aliases` and `issuer-aliases` configured in `application.properties`
-become readable Micrometer tag values on `ssf_receiver_events_processed_total`.
+The aliases of the event types become readable Micrometer tag values on
+`easyssf_receiver_events_total`.
 
 ## Disable
 
@@ -163,8 +163,8 @@ an unrelated REST resource):
 mvn -pl examples/example-transmitter-managed-stream quarkus:dev -Dquarkus.openid-ssf.receiver.enabled=false
 ```
 
-The CDI beans stay wired (so app code that touches `SsfStreamClient` directly
-still works), but no startup probe / push route registration runs.
+The CDI beans stay wired, but the stream is not looked up and no push
+endpoint is registered.
 
 ## What this example does *not* demonstrate
 

@@ -38,10 +38,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Native builds are slow (~5–10 min each) so we only check the two
-        # consumer apps. If they compile, the extension's bytecode is
-        # native-image-friendly.
+        # Native builds are slow (~5-10 min each). The resource server and the
+        # receiver-managed example run their integration tests against the
+        # native binary (easyssf's TestTransmitter stands in for the transmitter),
+        # which is where the JSON support shaded in Nimbus and the virtual threads
+        # of easyssf get exercised under GraalVM.
         example:
+          - example-resource-server
+          - example-oidc-client
           - example-transmitter-managed-stream
           - example-receiver-managed-stream
     runs-on: ubuntu-latest
@@ -59,14 +63,13 @@ jobs:
       - name: Install extension
         run: mvn -B -DskipTests -Dno-format -pl receiver/runtime,receiver/deployment install
 
-      - name: Native build
+      - name: Native build and integration tests
         run: |
-          mvn -B -DskipTests -Dno-format \
+          mvn -B -Dno-format \
             -pl receiver/examples/${{ matrix.example }} \
-            -am \
             -Pnative \
             -Dquarkus.native.container-build \
-            package
+            verify
 
       - name: Inspect native binary
         run: |

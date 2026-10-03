@@ -1,235 +1,218 @@
 package io.quarkiverse.ssf.receiver.deployment;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
-import static com.github.tomakehurst.wiremock.client.WireMock.post;
-import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.greaterThan;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.time.Duration;
-import java.util.ArrayList;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
-import org.jboss.shrinkwrap.api.ShrinkWrap;
-import org.jboss.shrinkwrap.api.spec.JavaArchive;
+import org.awaitility.Awaitility;
+import org.easyssf.core.event.SsfSubjectIdentifiers;
+import org.easyssf.receiver.http.JdkSsfHttpClient;
+import org.easyssf.receiver.http.SsfHttpClient;
+import org.easyssf.receiver.http.SsfHttpRequest;
+import org.easyssf.receiver.http.SsfHttpResponse;
+import org.easyssf.receiver.poll.SsfPoller;
+import org.easyssf.receiver.transmitter.SsfTransmitters;
+import org.easyssf.test.TestTransmitter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
-import com.github.tomakehurst.wiremock.client.WireMock;
-import com.github.tomakehurst.wiremock.stubbing.StubMapping;
-import com.github.tomakehurst.wiremock.verification.LoggedRequest;
-import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jwt.SignedJWT;
 
-import io.quarkiverse.ssf.receiver.runtime.delivery.poll.SsfPoller;
-import io.quarkiverse.ssf.receiver.runtime.event.SsfEventContext;
-import io.quarkiverse.ssf.receiver.runtime.event.SsfEventHandler;
+import io.quarkiverse.ssf.receiver.runtime.delivery.poll.SsfPollScheduler;
 import io.quarkus.test.QuarkusExtensionTest;
 
 /**
- * Layer-2 test for rate-limited poll endpoints (GH-13): a {@code 429} must open
- * a backoff window driven by {@code Retry-After}, falling back to
- * {@code poll.interval} without the header and never exceeding
- * {@code poll.rate-limit.max-backoff}. Polls inside the window are no-ops;
- * pending acks survive and are re-sent once the window closes.
+ * A rate-limited poll endpoint (GH-13): a {@code 429} opens a pause driven by
+ * {@code Retry-After}, falling back to {@code poll.rate-limit.fallback-backoff} without
+ * the header and never exceeding {@code poll.rate-limit.max-backoff}. Polls inside the
+ * pause send nothing; a pending acknowledgement survives and is sent afterwards.
  *
  * <p>
- * Timing knobs are deliberately tiny (interval 2s, max-backoff 4s) so each
- * bucket — {@code Retry-After: 1} ≤ 1s, fallback ∈ (1s, 2s], cap ∈ (2s, 4s] — is
- * distinguishable by inspecting {@link SsfPoller#rateLimitRemaining()}.
+ * The test transmitter never throttles, so an {@link SsfHttpClient} bean of the test
+ * stands in for the default one and answers the poll request with the status the test
+ * asks for. Which also shows that the HTTP client of the extension can be replaced.
  */
 public class PollerRateLimitTest {
 
-    private static final String ISSUER = "https://test.transmitter/realms/r1";
-    private static final String AUDIENCE = "https://my-receiver.example/ssf";
-    private static final String POLL_PATH = JwksWireMock.POLL_PATH;
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
     @RegisterExtension
     static final QuarkusExtensionTest TEST = new QuarkusExtensionTest()
-            .setArchiveProducer(() -> ShrinkWrap.create(JavaArchive.class)
-                    .addClasses(NoopHandler.class, JwksWireMock.class))
-            .setBeforeAllCustomizer(
-                    () -> JwksWireMock.start(ISSUER, AUDIENCE, JwksWireMock.DeliveryMode.POLL))
-            .setAfterAllCustomizer(JwksWireMock::stop)
-            .overrideConfigKey("quarkus.openid-ssf.receiver.transmitter-issuer", ISSUER)
-            .overrideConfigKey("quarkus.openid-ssf.receiver.expected-audience", AUDIENCE)
+            .setArchiveProducer(() -> TestTransmitters.archive(ThrottlingHttpClient.class))
+            .setBeforeAllCustomizer(() -> {
+                TestTransmitter transmitter = TestTransmitters.start();
+                TestTransmitters.addPollStream(TestTransmitters.DEFAULT, transmitter);
+            })
+            .setAfterAllCustomizer(TestTransmitters::stop)
+            .overrideConfigKey("quarkus.openid-ssf.receiver.transmitter-issuer",
+                    TestTransmitters.ref(TestTransmitters.issuerProperty(TestTransmitters.DEFAULT)))
+            .overrideConfigKey("quarkus.openid-ssf.receiver.expected-audience", TestTransmitter.AUDIENCE)
             .overrideConfigKey("quarkus.openid-ssf.receiver.stream-management", "TRANSMITTER")
-            .overrideConfigKey("quarkus.openid-ssf.receiver.stream-id", "stream-1")
+            .overrideConfigKey("quarkus.openid-ssf.receiver.stream-id",
+                    TestTransmitters.ref(TestTransmitters.streamIdProperty(TestTransmitters.DEFAULT)))
             .overrideConfigKey("quarkus.openid-ssf.receiver.delivery-method", "POLL")
             .overrideConfigKey("quarkus.openid-ssf.receiver.poll.auto-start", "false")
             .overrideConfigKey("quarkus.openid-ssf.receiver.poll.interval", "2s")
+            .overrideConfigKey("quarkus.openid-ssf.receiver.poll.rate-limit.fallback-backoff", "1500ms")
             .overrideConfigKey("quarkus.openid-ssf.receiver.poll.rate-limit.max-backoff", "4s")
+            .overrideConfigKey("quarkus.openid-ssf.receiver.transmitter-access-token", TestTransmitter.ACCESS_TOKEN)
             .overrideConfigKey("quarkus.openid-ssf.receiver.dedup.enabled", "false");
 
     @Inject
-    SsfPoller poller;
+    SsfPollScheduler scheduler;
 
-    private WireMock wm;
-    private RSAKey signingKey;
-    private final List<StubMapping> registeredStubs = new ArrayList<>();
+    @Inject
+    SsfTransmitters transmitters;
+
+    @Inject
+    SsfHttpClient httpClient;
+
+    private SsfPoller poller;
+
+    private ThrottlingHttpClient throttling;
 
     @BeforeEach
-    void resetWireMock() throws Exception {
-        int port = Integer.parseInt(System.getProperty(JwksWireMock.PROP_WIREMOCK_PORT));
-        wm = new WireMock("localhost", port);
-        for (StubMapping s : registeredStubs) {
-            wm.removeStubMapping(s);
-        }
-        registeredStubs.clear();
-        wm.resetRequests();
-        signingKey = RSAKey.parse(System.getProperty(JwksWireMock.PROP_PRIVATE_JWK));
-        // The poller is a singleton shared across test methods — let any
-        // backoff window left behind by the previous method expire first.
-        awaitBackoffCleared();
+    void reset() {
+        TestTransmitters.awaitRegistered(transmitters.primary().orElseThrow());
+        poller = transmitters.primary().orElseThrow().getPoller();
+        throttling = (ThrottlingHttpClient) httpClient;
+        throttling.reset();
+        TestTransmitters.current().acknowledgedSets().clear();
+        // the poller is shared by the test methods: let a pause of the previous one expire
+        Awaitility.await().atMost(Duration.ofSeconds(10)).until(() -> !paused());
+    }
+
+    private boolean paused() {
+        return poller.getPausedUntil().isAfter(Instant.now());
+    }
+
+    private Duration remainingPause() {
+        return Duration.between(Instant.now(), poller.getPausedUntil());
+    }
+
+    private void pollExpectingFailure() {
+        assertThrows(IllegalStateException.class, () -> scheduler.pollNow());
     }
 
     @Test
-    @DisplayName("429 + Retry-After → polls skipped until the deadline, pending acks re-sent afterwards")
+    @DisplayName("429 + Retry-After -> polls skipped until the deadline, the pending ack is re-sent afterwards")
     void retryAfterIsHonored() throws Exception {
-        // Cycle 1: one SET → handled → ack queued.
-        String setJwt = mintSet();
-        String jti = com.nimbusds.jwt.SignedJWT.parse(setJwt).getJWTClaimsSet().getJWTID();
-        stub(ok(pollResponseJson(Map.of(jti, setJwt))));
-        poller.pollNow();
+        TestTransmitter transmitter = TestTransmitters.current();
+        String set = transmitter.set("CaepSessionRevoked", SsfSubjectIdentifiers.opaque("user-1234"));
+        String jti = SignedJWT.parse(set).getJWTClaimsSet().getJWTID();
+        transmitter.queueSet(set);
 
-        // Cycle 2: transmitter throttles us for 1s.
-        StubMapping throttled = stub(aResponse().withStatus(429).withHeader("Retry-After", "1"));
-        poller.pollNow();
-        Optional<Duration> remaining = poller.rateLimitRemaining();
-        assertTrue(remaining.isPresent(), "a backoff window should be open");
-        assertThat(remaining.get(), lessThanOrEqualTo(Duration.ofSeconds(1)));
+        // the first request fetches the SET, the second one (the acknowledgement) is throttled
+        throttling.throttle(1, 429, "1");
+        pollExpectingFailure();
+        assertTrue(paused(), "a pause should be open");
+        assertThat(remainingPause(), lessThanOrEqualTo(Duration.ofSeconds(1)));
+        assertThat(transmitter.acknowledgedSets(), org.hamcrest.Matchers.not(hasItem(jti)));
 
-        // Inside the window: pollNow() is a no-op — no request hits the transmitter.
-        poller.pollNow();
-        assertEquals(2, pollRequests().size(), "no request may be sent while backing off");
+        // inside the pause: nothing is sent
+        int requests = throttling.pollRequests.get();
+        assertEquals(0, scheduler.pollNow());
+        assertEquals(requests, throttling.pollRequests.get(), "no request may be sent while pausing");
 
-        // Window closes → the ack that was in flight during the 429 is retried.
-        unstub(throttled);
-        stub(ok(pollResponseJson(Map.of())));
-        awaitBackoffCleared();
-        poller.pollNow();
-
-        List<LoggedRequest> reqs = pollRequests();
-        assertEquals(3, reqs.size());
-        assertThat(acksInRequest(reqs.get(0)), is(empty()));
-        assertThat(acksInRequest(reqs.get(1)), contains(jti));
-        assertThat(acksInRequest(reqs.get(2)), contains(jti));
+        // after the pause the acknowledgement goes out
+        Awaitility.await().atMost(Duration.ofSeconds(5)).until(() -> !paused());
+        scheduler.pollNow();
+        assertThat(transmitter.acknowledgedSets(), hasItem(jti));
     }
 
     @Test
-    @DisplayName("429 without Retry-After → backs off for one poll.interval")
-    void fallsBackToPollInterval() {
-        stub(aResponse().withStatus(429));
-        poller.pollNow();
-
-        Optional<Duration> remaining = poller.rateLimitRemaining();
-        assertTrue(remaining.isPresent());
-        assertThat(remaining.get(), greaterThan(Duration.ofSeconds(1)));
-        assertThat(remaining.get(), lessThanOrEqualTo(Duration.ofSeconds(2)));
+    @DisplayName("429 without Retry-After -> pauses for fallback-backoff")
+    void fallsBackToConfiguredBackoff() {
+        throttling.throttle(0, 429, null);
+        pollExpectingFailure();
+        assertTrue(paused());
+        assertThat(remainingPause(), greaterThan(Duration.ofMillis(500)));
+        assertThat(remainingPause(), lessThanOrEqualTo(Duration.ofMillis(1500)));
     }
 
     @Test
-    @DisplayName("Retry-After beyond poll.rate-limit.max-backoff is capped")
+    @DisplayName("Retry-After beyond max-backoff is capped")
     void retryAfterIsCapped() {
-        stub(aResponse().withStatus(429).withHeader("Retry-After", "3600"));
-        poller.pollNow();
-
-        Optional<Duration> remaining = poller.rateLimitRemaining();
-        assertTrue(remaining.isPresent());
-        assertThat(remaining.get(), greaterThan(Duration.ofSeconds(2)));
-        assertThat(remaining.get(), lessThanOrEqualTo(Duration.ofSeconds(4)));
+        throttling.throttle(0, 429, "3600");
+        pollExpectingFailure();
+        assertTrue(paused());
+        assertThat(remainingPause(), greaterThan(Duration.ofSeconds(2)));
+        assertThat(remainingPause(), lessThanOrEqualTo(Duration.ofSeconds(4)));
     }
 
     @Test
     @DisplayName("503 + Retry-After is honored too")
     void serviceUnavailableWithRetryAfter() {
-        stub(aResponse().withStatus(503).withHeader("Retry-After", "1"));
-        poller.pollNow();
-
-        Optional<Duration> remaining = poller.rateLimitRemaining();
-        assertTrue(remaining.isPresent());
-        assertThat(remaining.get(), lessThanOrEqualTo(Duration.ofSeconds(1)));
+        throttling.throttle(0, 503, "1");
+        pollExpectingFailure();
+        assertTrue(paused());
+        assertThat(remainingPause(), lessThanOrEqualTo(Duration.ofSeconds(1)));
     }
 
     @Test
-    @DisplayName("503 without Retry-After is an ordinary failure — no backoff")
+    @DisplayName("503 without Retry-After is an ordinary failure, no pause")
     void serviceUnavailableWithoutRetryAfter() {
-        stub(aResponse().withStatus(503));
-        poller.pollNow();
-        assertTrue(poller.rateLimitRemaining().isEmpty(), "plain 503 must not open a backoff window");
+        throttling.throttle(0, 503, null);
+        pollExpectingFailure();
+        assertFalse(paused(), "a plain 503 must not open a pause");
 
-        poller.pollNow();
-        assertEquals(2, pollRequests().size(), "next poll goes straight out");
+        int requests = throttling.pollRequests.get();
+        scheduler.pollNow();
+        assertEquals(requests + 1, throttling.pollRequests.get(), "the next poll goes straight out");
     }
 
-    // --- helpers -------------------------------------------------------------
-
-    private void awaitBackoffCleared() throws InterruptedException {
-        long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
-        while (poller.rateLimitRemaining().isPresent()) {
-            if (System.nanoTime() > deadline) {
-                throw new AssertionError("backoff window did not clear within 10s");
-            }
-            Thread.sleep(25);
-        }
-    }
-
-    private String mintSet() throws Exception {
-        return JwksWireMock.signClaims(JwksWireMock.canonicalClaims(ISSUER, AUDIENCE).build(),
-                signingKey, JwksWireMock.kid());
-    }
-
-    private static ResponseDefinitionBuilder ok(String json) {
-        return aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(json);
-    }
-
-    private StubMapping stub(ResponseDefinitionBuilder response) {
-        StubMapping mapping = wm.register(post(urlEqualTo(POLL_PATH)).willReturn(response));
-        registeredStubs.add(mapping);
-        return mapping;
-    }
-
-    private void unstub(StubMapping mapping) {
-        wm.removeStubMapping(mapping);
-        registeredStubs.remove(mapping);
-    }
-
-    private static String pollResponseJson(Map<String, String> sets) throws Exception {
-        return MAPPER.writeValueAsString(Map.of("sets", sets, "moreAvailable", false));
-    }
-
-    private List<LoggedRequest> pollRequests() {
-        return wm.find(postRequestedFor(urlEqualTo(POLL_PATH)));
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<String> acksInRequest(LoggedRequest req) throws Exception {
-        Map<String, Object> body = MAPPER.readValue(req.getBody(), Map.class);
-        Object acks = body.get("ack");
-        return acks == null ? List.of() : (List<String>) acks;
-    }
-
+    /**
+     * Replaces the {@code SsfHttpClient} of the extension: passes requests on to the JDK
+     * client, except for the poll requests it was told to throttle.
+     */
     @Singleton
-    public static class NoopHandler implements SsfEventHandler {
+    public static class ThrottlingHttpClient implements SsfHttpClient {
+        private final SsfHttpClient delegate = new JdkSsfHttpClient();
+        final AtomicInteger pollRequests = new AtomicInteger();
+        private final AtomicInteger passThrough = new AtomicInteger();
+        private final AtomicReference<SsfHttpResponse> throttled = new AtomicReference<>();
+
+        /** The next {@code passThrough} poll requests go out, the one after is throttled. */
+        void throttle(int passThrough, int status, String retryAfter) {
+            this.passThrough.set(passThrough);
+            Map<String, List<String>> headers = (retryAfter != null) ? Map.of("Retry-After", List.of(retryAfter))
+                    : Map.of();
+            throttled.set(new SsfHttpResponse(status, headers, null));
+        }
+
+        void reset() {
+            pollRequests.set(0);
+            passThrough.set(0);
+            throttled.set(null);
+        }
+
         @Override
-        public void handle(SsfEventContext eventContext) {
-            // accept everything so the jti gets acked
+        public SsfHttpResponse execute(SsfHttpRequest request) throws IOException {
+            if ("POST".equals(request.method()) && request.uri().getPath().endsWith("/poll")) {
+                pollRequests.incrementAndGet();
+                SsfHttpResponse response = throttled.get();
+                if (response != null && passThrough.getAndDecrement() <= 0) {
+                    throttled.set(null);
+                    return response;
+                }
+            }
+            return delegate.execute(request);
         }
     }
 }

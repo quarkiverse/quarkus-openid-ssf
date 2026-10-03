@@ -1,64 +1,58 @@
 package io.quarkiverse.ssf.receiver.deployment;
 
 import static io.restassured.RestAssured.given;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.hamcrest.Matchers.equalTo;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
-import org.jboss.shrinkwrap.api.ShrinkWrap;
-import org.jboss.shrinkwrap.api.spec.JavaArchive;
+import org.easyssf.core.event.SsfSubjectIdentifiers;
+import org.easyssf.receiver.event.SsfEventContext;
+import org.easyssf.receiver.event.SsfEventHandler;
+import org.easyssf.test.TestTransmitter;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-import io.quarkiverse.ssf.receiver.runtime.event.SsfEventContext;
-import io.quarkiverse.ssf.receiver.runtime.event.SsfEventHandler;
-import io.quarkiverse.ssf.receiver.runtime.event.SsfEventToken;
 import io.quarkus.test.QuarkusExtensionTest;
 import io.restassured.RestAssured;
 import io.restassured.config.EncoderConfig;
 import io.restassured.http.ContentType;
 
 /**
- * Layer-2 test: the push-endpoint's shared-secret check honors
- * {@code quarkus.openid-ssf.receiver.push.expected-auth-header} exactly. Wrong / missing
- * Authorization → 401, correct → 202 + handler invocation.
- *
- * <p>
- * Also covers the "handler throws → still 202" contract (the SET was
- * accepted, the handler's failure is logged but doesn't surface to the
- * transmitter).
+ * The push endpoint honors {@code push.expected-auth-header} exactly and answers with
+ * the RFC 8935 error documents. A failing handler yields {@code 500} so that the
+ * transmitter delivers the SET again.
  */
 public class PushRouteAuthTest {
 
-    private static final String ISSUER = "https://test.transmitter/realms/r1";
-    private static final String AUDIENCE = "https://my-receiver.example/ssf";
     private static final String SHARED_SECRET = "Bearer s3cret-shared";
 
     @RegisterExtension
     static final QuarkusExtensionTest TEST = new QuarkusExtensionTest()
-            .setArchiveProducer(() -> ShrinkWrap.create(JavaArchive.class)
-                    .addClasses(ThrowingHandler.class, JwksWireMock.class))
-            .setBeforeAllCustomizer(() -> JwksWireMock.start(ISSUER, AUDIENCE))
-            .setAfterAllCustomizer(JwksWireMock::stop)
-            .overrideConfigKey("quarkus.openid-ssf.receiver.transmitter-issuer", ISSUER)
-            .overrideConfigKey("quarkus.openid-ssf.receiver.expected-audience", AUDIENCE)
+            .setArchiveProducer(() -> TestTransmitters.archive(ThrowingHandler.class))
+            .setBeforeAllCustomizer(() -> {
+                TestTransmitter transmitter = TestTransmitters.start();
+                TestTransmitters.addPushStream(TestTransmitters.DEFAULT, transmitter);
+            })
+            .setAfterAllCustomizer(TestTransmitters::stop)
+            .overrideConfigKey("quarkus.openid-ssf.receiver.transmitter-issuer",
+                    TestTransmitters.ref(TestTransmitters.issuerProperty(TestTransmitters.DEFAULT)))
+            .overrideConfigKey("quarkus.openid-ssf.receiver.expected-audience", TestTransmitter.AUDIENCE)
             .overrideConfigKey("quarkus.openid-ssf.receiver.stream-management", "TRANSMITTER")
-            .overrideConfigKey("quarkus.openid-ssf.receiver.stream-id", "stream-1")
+            .overrideConfigKey("quarkus.openid-ssf.receiver.stream-id",
+                    TestTransmitters.ref(TestTransmitters.streamIdProperty(TestTransmitters.DEFAULT)))
             .overrideConfigKey("quarkus.openid-ssf.receiver.delivery-method", "PUSH")
             .overrideConfigKey("quarkus.openid-ssf.receiver.push.expected-auth-header", SHARED_SECRET)
-            // Disable dedup so the same SET can be posted multiple times
-            // without being silently skipped on the second attempt.
+            .overrideConfigKey("quarkus.openid-ssf.receiver.push.endpoint-path", "/ssf/push")
+            .overrideConfigKey("quarkus.openid-ssf.receiver.transmitter-access-token", TestTransmitter.ACCESS_TOKEN)
+            // the same SET is posted several times
             .overrideConfigKey("quarkus.openid-ssf.receiver.dedup.enabled", "false");
 
     @Inject
@@ -67,8 +61,7 @@ public class PushRouteAuthTest {
     @BeforeAll
     static void registerSeceventEncoder() {
         RestAssured.config = RestAssured.config().encoderConfig(
-                EncoderConfig.encoderConfig()
-                        .encodeContentTypeAs("application/secevent+jwt", ContentType.TEXT));
+                EncoderConfig.encoderConfig().encodeContentTypeAs("application/secevent+jwt", ContentType.TEXT));
     }
 
     @BeforeEach
@@ -76,115 +69,68 @@ public class PushRouteAuthTest {
         ((ThrowingHandler) handler).reset();
     }
 
-    @Test
-    @DisplayName("Correct Authorization header → 202 + handler invoked")
-    void correctAuthAccepts() throws Exception {
-        String setJwt = System.getProperty(JwksWireMock.PROP_VALID_SET);
-
-        given()
-                .header("Content-Type", "application/secevent+jwt")
-                .header("Authorization", SHARED_SECRET)
-                .body(setJwt)
-                .when()
-                .post("/ssf/push")
-                .then()
-                .statusCode(202);
-
-        ThrowingHandler captured = (ThrowingHandler) handler;
-        assertTrue(captured.latch.await(5, TimeUnit.SECONDS), "handler was not invoked within 5s");
-        assertNotNull(captured.last.get());
+    private static String validSet() {
+        return TestTransmitters.current().set("CaepSessionRevoked", SsfSubjectIdentifiers.opaque("user-1234"));
     }
 
     @Test
-    @DisplayName("Wrong Authorization header → 401, handler NOT invoked")
-    void wrongAuthRejects() throws Exception {
-        String setJwt = System.getProperty(JwksWireMock.PROP_VALID_SET);
-
-        given()
-                .header("Content-Type", "application/secevent+jwt")
-                .header("Authorization", "Bearer wrong-secret")
-                .body(setJwt)
-                .when()
-                .post("/ssf/push")
-                .then()
-                .statusCode(401);
-
-        ThrowingHandler captured = (ThrowingHandler) handler;
-        // Latch should NOT count down; verify it's still > 0 by waiting briefly.
-        // We can't await(0) reliably, so check that waiting 200ms times out.
-        boolean handlerWasCalled = captured.latch.await(200, TimeUnit.MILLISECONDS);
-        assertTrue(!handlerWasCalled, "handler must not be invoked on 401");
+    @DisplayName("Correct Authorization header -> 202, handler invoked")
+    void correctAuthAccepts() {
+        given().header("Content-Type", "application/secevent+jwt").header("Authorization", SHARED_SECRET)
+                .body(validSet())
+                .when().post("/ssf/push")
+                .then().statusCode(202);
+        assertEquals(1, ((ThrowingHandler) handler).invocations.get());
     }
 
     @Test
-    @DisplayName("Missing Authorization header → 401")
+    @DisplayName("Wrong Authorization header -> 401 authentication_failed, handler not invoked")
+    void wrongAuthRejects() {
+        given().header("Content-Type", "application/secevent+jwt").header("Authorization", "Bearer wrong-secret")
+                .body(validSet())
+                .when().post("/ssf/push")
+                .then().statusCode(401)
+                .contentType("application/json")
+                .body("err", equalTo("authentication_failed"));
+        assertEquals(0, ((ThrowingHandler) handler).invocations.get());
+    }
+
+    @Test
+    @DisplayName("Missing Authorization header -> 401")
     void missingAuthRejects() {
-        String setJwt = System.getProperty(JwksWireMock.PROP_VALID_SET);
-
-        given()
-                .header("Content-Type", "application/secevent+jwt")
-                .body(setJwt)
-                .when()
-                .post("/ssf/push")
-                .then()
-                .statusCode(401);
+        given().header("Content-Type", "application/secevent+jwt").body(validSet())
+                .when().post("/ssf/push")
+                .then().statusCode(401)
+                .body("err", equalTo("authentication_failed"));
     }
 
     @Test
-    @DisplayName("Handler throws → still 202 (the SET was accepted; handler error is logged)")
-    void handlerThrowsStill202() throws Exception {
-        String setJwt = System.getProperty(JwksWireMock.PROP_VALID_SET);
-
+    @DisplayName("Handler throws -> 500, the transmitter delivers the SET again")
+    void handlerThrowsYields500() {
         ((ThrowingHandler) handler).throwOnNext.set(true);
-
-        given()
-                .header("Content-Type", "application/secevent+jwt")
-                .header("Authorization", SHARED_SECRET)
-                .body(setJwt)
-                .when()
-                .post("/ssf/push")
-                .then()
-                .statusCode(202);
-
-        ThrowingHandler captured = (ThrowingHandler) handler;
-        // Verify the handler was actually called (and threw) — the exception
-        // shouldn't escape into the HTTP response.
-        assertTrue(captured.latch.await(5, TimeUnit.SECONDS),
-                "handler was not invoked even though SET was accepted");
-        assertTrue(captured.threwLastTime.get(),
-                "handler should have thrown; the test relies on the exception path");
+        given().header("Content-Type", "application/secevent+jwt").header("Authorization", SHARED_SECRET)
+                .body(validSet())
+                .when().post("/ssf/push")
+                .then().statusCode(500);
+        assertEquals(1, ((ThrowingHandler) handler).invocations.get());
     }
 
     @Singleton
     public static class ThrowingHandler implements SsfEventHandler {
-        // volatile so test threads observe the new latch immediately after reset().
-        volatile CountDownLatch latch = new CountDownLatch(1);
-        final AtomicReference<SsfEventToken> last = new AtomicReference<>();
         final AtomicInteger invocations = new AtomicInteger();
         final AtomicBoolean throwOnNext = new AtomicBoolean(false);
-        final AtomicBoolean threwLastTime = new AtomicBoolean(false);
 
         @Override
         public void handle(SsfEventContext eventContext) {
-            last.set(eventContext.eventToken());
             invocations.incrementAndGet();
-            try {
-                if (throwOnNext.compareAndSet(true, false)) {
-                    threwLastTime.set(true);
-                    throw new RuntimeException("handler intentionally throws for the 'still 202' test");
-                }
-                threwLastTime.set(false);
-            } finally {
-                latch.countDown();
+            if (throwOnNext.compareAndSet(true, false)) {
+                throw new RuntimeException("handler intentionally throws");
             }
         }
 
         void reset() {
-            latch = new CountDownLatch(1);
-            last.set(null);
             invocations.set(0);
             throwOnNext.set(false);
-            threwLastTime.set(false);
         }
     }
 }
