@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.inject.Instance;
@@ -92,6 +93,8 @@ public class SsfReceiverProducers {
         SsfSetProcessor processor = new SsfSetProcessor(verifier, store, orderedHandlers(handlers));
         processor.setMetrics(metrics);
         processor.setStreamVerifications(issuer -> transmitters.get().streamVerification(issuer));
+        processor.setUnderstoodSubjectMembers(Set.copyOf(config.understoodSubjectMembers()));
+        processor.setCriticalSubjectMembers(issuer -> transmitters.get().criticalSubjectMembers(issuer));
         return processor;
     }
 

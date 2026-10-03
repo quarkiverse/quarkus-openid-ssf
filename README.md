@@ -343,6 +343,19 @@ quarkus.openid-ssf.receiver.event-aliases.VendorWidgetReplaced=https://schemas.e
 `SsfEventTypes.resolve(aliasOrUri)` and `SsfEventTypes.aliasOf(uri)` do the
 lookups in application code.
 
+## Critical subject members
+
+A transmitter can declare in its metadata (`critical_subject_members`) members of a
+complex subject that a receiver must interpret. A SET whose subject has such a member
+is rejected (`invalid_request`) unless the member is one the application understands.
+By default these are the members `SsfSubject` gives access to: `user`, `session`,
+`device`, `application`, `tenant`, `org_unit` and `group`. If the application
+interprets others, or fewer, list them:
+
+```properties
+quarkus.openid-ssf.receiver.understood-subject-members=user,session,tenant,workspace
+```
+
 ## Disable switch
 
 ```properties
