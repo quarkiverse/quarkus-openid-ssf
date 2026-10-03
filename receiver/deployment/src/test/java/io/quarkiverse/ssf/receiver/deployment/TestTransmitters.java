@@ -19,7 +19,7 @@ import org.jboss.shrinkwrap.api.spec.JavaArchive;
  * test methods.
  *
  * <p>
- * {@code QuarkusExtensionTest} runs the test methods in the Quarkus class loader, while
+ * {@code QuarkusUnitTest} runs the test methods in the Quarkus class loader, while
  * {@code setBeforeAllCustomizer} runs in the class loader of the test. The archive built
  * by {@link #archive(Class[])} makes the test transmitter and what its API refers to
  * (easyssf-core, Nimbus) parent-first, so both see the same classes and the instance

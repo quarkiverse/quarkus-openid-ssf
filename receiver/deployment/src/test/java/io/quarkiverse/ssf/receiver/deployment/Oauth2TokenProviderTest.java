@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import io.quarkiverse.ssf.receiver.runtime.stream.SsfReceiverStreamClient;
-import io.quarkus.test.QuarkusExtensionTest;
+import io.quarkus.test.QuarkusUnitTest;
 
 /**
  * The OAuth2 client credentials provider ({@code oauth2.*}) with
@@ -26,7 +26,7 @@ import io.quarkus.test.QuarkusExtensionTest;
 public class Oauth2TokenProviderTest {
 
     @RegisterExtension
-    static final QuarkusExtensionTest TEST = new QuarkusExtensionTest()
+    static final QuarkusUnitTest TEST = new QuarkusUnitTest()
             .setArchiveProducer(() -> TestTransmitters.archive())
             .setBeforeAllCustomizer(() -> {
                 TestTransmitter transmitter = TestTransmitters.start();

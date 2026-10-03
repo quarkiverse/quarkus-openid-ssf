@@ -10,7 +10,7 @@
     </parent>
 
     <artifactId>quarkus-openid-ssf-receiver-example-transmitter-managed-stream</artifactId>
-    <packaging>quarkus</packaging>
+    <packaging>jar</packaging>
     <name>Quarkus OpenID SSF - Receiver - Example: Transmitter-managed stream</name>
 
     <dependencies>
@@ -54,6 +54,15 @@
                 <groupId>io.quarkus</groupId>
                 <artifactId>quarkus-maven-plugin</artifactId>
                 <extensions>true</extensions>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>build</goal>
+                            <goal>generate-code</goal>
+                            <goal>generate-code-tests</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import io.quarkiverse.ssf.receiver.runtime.stream.SsfReceiverStreamClient;
-import io.quarkus.test.QuarkusExtensionTest;
+import io.quarkus.test.QuarkusUnitTest;
 
 /**
  * The error surface of the stream management API: argument validation throws
@@ -28,7 +28,7 @@ import io.quarkus.test.QuarkusExtensionTest;
 public class SsfStreamClientErrorsTest {
 
     @RegisterExtension
-    static final QuarkusExtensionTest TEST = new QuarkusExtensionTest()
+    static final QuarkusUnitTest TEST = new QuarkusUnitTest()
             .setArchiveProducer(() -> TestTransmitters.archive())
             .setBeforeAllCustomizer(() -> {
                 TestTransmitter transmitter = TestTransmitters.start();

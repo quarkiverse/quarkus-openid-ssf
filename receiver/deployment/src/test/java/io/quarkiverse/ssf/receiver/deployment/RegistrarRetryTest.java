@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import io.quarkiverse.ssf.receiver.runtime.stream.SsfReceiverStreamClient;
-import io.quarkus.test.QuarkusExtensionTest;
+import io.quarkus.test.QuarkusUnitTest;
 
 /**
  * A transmitter that is down while the application starts does not keep it from
@@ -28,7 +28,7 @@ import io.quarkus.test.QuarkusExtensionTest;
 public class RegistrarRetryTest {
 
     @RegisterExtension
-    static final QuarkusExtensionTest TEST = new QuarkusExtensionTest()
+    static final QuarkusUnitTest TEST = new QuarkusUnitTest()
             .setArchiveProducer(() -> TestTransmitters.archive())
             .setBeforeAllCustomizer(() -> TestTransmitters.start().setAvailable(false))
             .setAfterAllCustomizer(TestTransmitters::stop)

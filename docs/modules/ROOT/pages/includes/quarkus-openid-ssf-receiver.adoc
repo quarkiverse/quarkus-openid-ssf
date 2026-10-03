@@ -7,7 +7,7 @@ h|[.header-title]##Configuration property##
 h|Type
 h|Default
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-enabled]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-enabled[`+++quarkus.openid-ssf.receiver.enabled+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-enabled]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-enabled[`quarkus.openid-ssf.receiver.enabled`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.enabled+++[]
 endif::add-copy-button-to-config-props[]
@@ -32,13 +32,13 @@ h|[[quarkus-openid-ssf-receiver_section_quarkus-openid-ssf-receiver]] [.section-
 h|Type
 h|Default
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-issuer]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-issuer[`+++quarkus.openid-ssf.receiver.transmitter-issuer+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-issuer]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-issuer[`quarkus.openid-ssf.receiver.transmitter-issuer`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.transmitter-issuer+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".transmitter-issuer+++`
+`quarkus.openid-ssf.receiver."transmitter-name".transmitter-issuer`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".transmitter-issuer+++[]
 endif::add-copy-button-to-config-props[]
@@ -58,13 +58,13 @@ endif::add-copy-button-to-env-var[]
 |string
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-metadata-url]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-metadata-url[`+++quarkus.openid-ssf.receiver.transmitter-metadata-url+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-metadata-url]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-metadata-url[`quarkus.openid-ssf.receiver.transmitter-metadata-url`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.transmitter-metadata-url+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".transmitter-metadata-url+++`
+`quarkus.openid-ssf.receiver."transmitter-name".transmitter-metadata-url`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".transmitter-metadata-url+++[]
 endif::add-copy-button-to-config-props[]
@@ -86,13 +86,13 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/net/URI.html[URI]
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-jwks-url]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-jwks-url[`+++quarkus.openid-ssf.receiver.transmitter-jwks-url+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-jwks-url]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-jwks-url[`quarkus.openid-ssf.receiver.transmitter-jwks-url`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.transmitter-jwks-url+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".transmitter-jwks-url+++`
+`quarkus.openid-ssf.receiver."transmitter-name".transmitter-jwks-url`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".transmitter-jwks-url+++[]
 endif::add-copy-button-to-config-props[]
@@ -112,13 +112,13 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/net/URI.html[URI]
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-allow-insecure-http]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-allow-insecure-http[`+++quarkus.openid-ssf.receiver.allow-insecure-http+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-allow-insecure-http]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-allow-insecure-http[`quarkus.openid-ssf.receiver.allow-insecure-http`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.allow-insecure-http+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".allow-insecure-http+++`
+`quarkus.openid-ssf.receiver."transmitter-name".allow-insecure-http`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".allow-insecure-http+++[]
 endif::add-copy-button-to-config-props[]
@@ -138,13 +138,13 @@ endif::add-copy-button-to-env-var[]
 |boolean
 |`+++false+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-expected-audience]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-expected-audience[`+++quarkus.openid-ssf.receiver.expected-audience+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-expected-audience]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-expected-audience[`quarkus.openid-ssf.receiver.expected-audience`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.expected-audience+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".expected-audience+++`
+`quarkus.openid-ssf.receiver."transmitter-name".expected-audience`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".expected-audience+++[]
 endif::add-copy-button-to-config-props[]
@@ -164,13 +164,13 @@ endif::add-copy-button-to-env-var[]
 |string
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-stream-management]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-stream-management[`+++quarkus.openid-ssf.receiver.stream-management+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-stream-management]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-stream-management[`quarkus.openid-ssf.receiver.stream-management`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.stream-management+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".stream-management+++`
+`quarkus.openid-ssf.receiver."transmitter-name".stream-management`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".stream-management+++[]
 endif::add-copy-button-to-config-props[]
@@ -190,13 +190,13 @@ endif::add-copy-button-to-env-var[]
 a|`transmitter`, `receiver`
 |`+++receiver+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-stream-id]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-stream-id[`+++quarkus.openid-ssf.receiver.stream-id+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-stream-id]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-stream-id[`quarkus.openid-ssf.receiver.stream-id`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.stream-id+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".stream-id+++`
+`quarkus.openid-ssf.receiver."transmitter-name".stream-id`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".stream-id+++[]
 endif::add-copy-button-to-config-props[]
@@ -216,13 +216,13 @@ endif::add-copy-button-to-env-var[]
 |string
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-delivery-method]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-delivery-method[`+++quarkus.openid-ssf.receiver.delivery-method+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-delivery-method]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-delivery-method[`quarkus.openid-ssf.receiver.delivery-method`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.delivery-method+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".delivery-method+++`
+`quarkus.openid-ssf.receiver."transmitter-name".delivery-method`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".delivery-method+++[]
 endif::add-copy-button-to-config-props[]
@@ -242,13 +242,13 @@ endif::add-copy-button-to-env-var[]
 a|`push`, `poll`
 |`+++push+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-events-requested]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-events-requested[`+++quarkus.openid-ssf.receiver.events-requested+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-events-requested]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-events-requested[`quarkus.openid-ssf.receiver.events-requested`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.events-requested+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".events-requested+++`
+`quarkus.openid-ssf.receiver."transmitter-name".events-requested`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".events-requested+++[]
 endif::add-copy-button-to-config-props[]
@@ -268,13 +268,13 @@ endif::add-copy-button-to-env-var[]
 |list of string
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-access-token]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-access-token[`+++quarkus.openid-ssf.receiver.transmitter-access-token+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-access-token]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-transmitter-access-token[`quarkus.openid-ssf.receiver.transmitter-access-token`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.transmitter-access-token+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".transmitter-access-token+++`
+`quarkus.openid-ssf.receiver."transmitter-name".transmitter-access-token`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".transmitter-access-token+++[]
 endif::add-copy-button-to-config-props[]
@@ -294,13 +294,13 @@ endif::add-copy-button-to-env-var[]
 |string
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-expected-auth-header]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-expected-auth-header[`+++quarkus.openid-ssf.receiver.push.expected-auth-header+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-expected-auth-header]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-expected-auth-header[`quarkus.openid-ssf.receiver.push.expected-auth-header`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.push.expected-auth-header+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".push.expected-auth-header+++`
+`quarkus.openid-ssf.receiver."transmitter-name".push.expected-auth-header`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".push.expected-auth-header+++[]
 endif::add-copy-button-to-config-props[]
@@ -320,13 +320,13 @@ endif::add-copy-button-to-env-var[]
 |string
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-delivery-endpoint-url]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-delivery-endpoint-url[`+++quarkus.openid-ssf.receiver.push.delivery-endpoint-url+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-delivery-endpoint-url]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-delivery-endpoint-url[`quarkus.openid-ssf.receiver.push.delivery-endpoint-url`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.push.delivery-endpoint-url+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".push.delivery-endpoint-url+++`
+`quarkus.openid-ssf.receiver."transmitter-name".push.delivery-endpoint-url`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".push.delivery-endpoint-url+++[]
 endif::add-copy-button-to-config-props[]
@@ -346,13 +346,13 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/net/URI.html[URI]
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-endpoint-url]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-endpoint-url[`+++quarkus.openid-ssf.receiver.poll.endpoint-url+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-endpoint-url]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-endpoint-url[`quarkus.openid-ssf.receiver.poll.endpoint-url`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.endpoint-url+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".poll.endpoint-url+++`
+`quarkus.openid-ssf.receiver."transmitter-name".poll.endpoint-url`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".poll.endpoint-url+++[]
 endif::add-copy-button-to-config-props[]
@@ -372,13 +372,13 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/net/URI.html[URI]
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-auto-start]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-auto-start[`+++quarkus.openid-ssf.receiver.poll.auto-start+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-auto-start]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-auto-start[`quarkus.openid-ssf.receiver.poll.auto-start`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.auto-start+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".poll.auto-start+++`
+`quarkus.openid-ssf.receiver."transmitter-name".poll.auto-start`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".poll.auto-start+++[]
 endif::add-copy-button-to-config-props[]
@@ -398,13 +398,13 @@ endif::add-copy-button-to-env-var[]
 |boolean
 |`+++true+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-start-delay]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-start-delay[`+++quarkus.openid-ssf.receiver.poll.start-delay+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-start-delay]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-start-delay[`quarkus.openid-ssf.receiver.poll.start-delay`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.start-delay+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".poll.start-delay+++`
+`quarkus.openid-ssf.receiver."transmitter-name".poll.start-delay`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".poll.start-delay+++[]
 endif::add-copy-button-to-config-props[]
@@ -424,13 +424,13 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
 |`+++0S+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-interval]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-interval[`+++quarkus.openid-ssf.receiver.poll.interval+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-interval]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-interval[`quarkus.openid-ssf.receiver.poll.interval`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.interval+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".poll.interval+++`
+`quarkus.openid-ssf.receiver."transmitter-name".poll.interval`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".poll.interval+++[]
 endif::add-copy-button-to-config-props[]
@@ -450,13 +450,13 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
 |`+++30S+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-max-events]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-max-events[`+++quarkus.openid-ssf.receiver.poll.max-events+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-max-events]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-max-events[`quarkus.openid-ssf.receiver.poll.max-events`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.max-events+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".poll.max-events+++`
+`quarkus.openid-ssf.receiver."transmitter-name".poll.max-events`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".poll.max-events+++[]
 endif::add-copy-button-to-config-props[]
@@ -476,13 +476,13 @@ endif::add-copy-button-to-env-var[]
 |int
 |`+++100+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-rate-limit-fallback-backoff]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-rate-limit-fallback-backoff[`+++quarkus.openid-ssf.receiver.poll.rate-limit.fallback-backoff+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-rate-limit-fallback-backoff]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-rate-limit-fallback-backoff[`quarkus.openid-ssf.receiver.poll.rate-limit.fallback-backoff`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.rate-limit.fallback-backoff+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".poll.rate-limit.fallback-backoff+++`
+`quarkus.openid-ssf.receiver."transmitter-name".poll.rate-limit.fallback-backoff`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".poll.rate-limit.fallback-backoff+++[]
 endif::add-copy-button-to-config-props[]
@@ -502,13 +502,13 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-rate-limit-max-backoff]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-rate-limit-max-backoff[`+++quarkus.openid-ssf.receiver.poll.rate-limit.max-backoff+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-rate-limit-max-backoff]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-rate-limit-max-backoff[`quarkus.openid-ssf.receiver.poll.rate-limit.max-backoff`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.rate-limit.max-backoff+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".poll.rate-limit.max-backoff+++`
+`quarkus.openid-ssf.receiver."transmitter-name".poll.rate-limit.max-backoff`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".poll.rate-limit.max-backoff+++[]
 endif::add-copy-button-to-config-props[]
@@ -528,13 +528,13 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
 |`+++5M+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-receiver-managed-delete-on-shutdown]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-receiver-managed-delete-on-shutdown[`+++quarkus.openid-ssf.receiver.receiver-managed.delete-on-shutdown+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-receiver-managed-delete-on-shutdown]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-receiver-managed-delete-on-shutdown[`quarkus.openid-ssf.receiver.receiver-managed.delete-on-shutdown`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.receiver-managed.delete-on-shutdown+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".receiver-managed.delete-on-shutdown+++`
+`quarkus.openid-ssf.receiver."transmitter-name".receiver-managed.delete-on-shutdown`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".receiver-managed.delete-on-shutdown+++[]
 endif::add-copy-button-to-config-props[]
@@ -554,13 +554,13 @@ endif::add-copy-button-to-env-var[]
 |boolean
 |`+++false+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-receiver-managed-description]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-receiver-managed-description[`+++quarkus.openid-ssf.receiver.receiver-managed.description+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-receiver-managed-description]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-receiver-managed-description[`quarkus.openid-ssf.receiver.receiver-managed.description`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.receiver-managed.description+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".receiver-managed.description+++`
+`quarkus.openid-ssf.receiver."transmitter-name".receiver-managed.description`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".receiver-managed.description+++[]
 endif::add-copy-button-to-config-props[]
@@ -580,13 +580,13 @@ endif::add-copy-button-to-env-var[]
 |string
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-accepted-algorithms]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-accepted-algorithms[`+++quarkus.openid-ssf.receiver.set-validation.accepted-algorithms+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-accepted-algorithms]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-accepted-algorithms[`quarkus.openid-ssf.receiver.set-validation.accepted-algorithms`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.set-validation.accepted-algorithms+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.accepted-algorithms+++`
+`quarkus.openid-ssf.receiver."transmitter-name".set-validation.accepted-algorithms`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.accepted-algorithms+++[]
 endif::add-copy-button-to-config-props[]
@@ -606,13 +606,13 @@ endif::add-copy-button-to-env-var[]
 |list of string
 |`+++RS256+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-min-rsa-key-size]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-min-rsa-key-size[`+++quarkus.openid-ssf.receiver.set-validation.min-rsa-key-size+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-min-rsa-key-size]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-min-rsa-key-size[`quarkus.openid-ssf.receiver.set-validation.min-rsa-key-size`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.set-validation.min-rsa-key-size+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.min-rsa-key-size+++`
+`quarkus.openid-ssf.receiver."transmitter-name".set-validation.min-rsa-key-size`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.min-rsa-key-size+++[]
 endif::add-copy-button-to-config-props[]
@@ -632,13 +632,13 @@ endif::add-copy-button-to-env-var[]
 |int
 |`+++2048+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-require-type-header]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-require-type-header[`+++quarkus.openid-ssf.receiver.set-validation.require-type-header+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-require-type-header]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-require-type-header[`quarkus.openid-ssf.receiver.set-validation.require-type-header`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.set-validation.require-type-header+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.require-type-header+++`
+`quarkus.openid-ssf.receiver."transmitter-name".set-validation.require-type-header`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.require-type-header+++[]
 endif::add-copy-button-to-config-props[]
@@ -658,13 +658,13 @@ endif::add-copy-button-to-env-var[]
 |boolean
 |`+++true+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-clock-skew]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-clock-skew[`+++quarkus.openid-ssf.receiver.set-validation.clock-skew+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-clock-skew]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-clock-skew[`quarkus.openid-ssf.receiver.set-validation.clock-skew`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.set-validation.clock-skew+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.clock-skew+++`
+`quarkus.openid-ssf.receiver."transmitter-name".set-validation.clock-skew`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.clock-skew+++[]
 endif::add-copy-button-to-config-props[]
@@ -684,13 +684,13 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
 |`+++60S+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-token-endpoint]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-token-endpoint[`+++quarkus.openid-ssf.receiver.oauth2.token-endpoint+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-token-endpoint]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-token-endpoint[`quarkus.openid-ssf.receiver.oauth2.token-endpoint`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.token-endpoint+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.token-endpoint+++`
+`quarkus.openid-ssf.receiver."transmitter-name".oauth2.token-endpoint`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.token-endpoint+++[]
 endif::add-copy-button-to-config-props[]
@@ -710,13 +710,13 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/net/URI.html[URI]
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-id]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-id[`+++quarkus.openid-ssf.receiver.oauth2.client-id+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-id]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-id[`quarkus.openid-ssf.receiver.oauth2.client-id`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.client-id+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.client-id+++`
+`quarkus.openid-ssf.receiver."transmitter-name".oauth2.client-id`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.client-id+++[]
 endif::add-copy-button-to-config-props[]
@@ -736,13 +736,13 @@ endif::add-copy-button-to-env-var[]
 |string
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-secret]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-secret[`+++quarkus.openid-ssf.receiver.oauth2.client-secret+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-secret]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-secret[`quarkus.openid-ssf.receiver.oauth2.client-secret`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.client-secret+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.client-secret+++`
+`quarkus.openid-ssf.receiver."transmitter-name".oauth2.client-secret`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.client-secret+++[]
 endif::add-copy-button-to-config-props[]
@@ -762,13 +762,13 @@ endif::add-copy-button-to-env-var[]
 |string
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-scopes]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-scopes[`+++quarkus.openid-ssf.receiver.oauth2.scopes+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-scopes]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-scopes[`quarkus.openid-ssf.receiver.oauth2.scopes`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.scopes+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.scopes+++`
+`quarkus.openid-ssf.receiver."transmitter-name".oauth2.scopes`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.scopes+++[]
 endif::add-copy-button-to-config-props[]
@@ -788,13 +788,13 @@ endif::add-copy-button-to-env-var[]
 |list of string
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-auth-method]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-auth-method[`+++quarkus.openid-ssf.receiver.oauth2.client-auth-method+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-auth-method]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-client-auth-method[`quarkus.openid-ssf.receiver.oauth2.client-auth-method`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.client-auth-method+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.client-auth-method+++`
+`quarkus.openid-ssf.receiver."transmitter-name".oauth2.client-auth-method`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.client-auth-method+++[]
 endif::add-copy-button-to-config-props[]
@@ -814,13 +814,13 @@ endif::add-copy-button-to-env-var[]
 a|`basic`, `post`
 |`+++basic+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-additional-params-parameter]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-additional-params-parameter[`+++quarkus.openid-ssf.receiver.oauth2.additional-params."parameter"+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-additional-params-parameter]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-additional-params-parameter[`quarkus.openid-ssf.receiver.oauth2.additional-params."parameter"`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.additional-params."parameter"+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.additional-params."parameter"+++`
+`quarkus.openid-ssf.receiver."transmitter-name".oauth2.additional-params."parameter"`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.additional-params."parameter"+++[]
 endif::add-copy-button-to-config-props[]
@@ -840,13 +840,13 @@ endif::add-copy-button-to-env-var[]
 |Map<String,String>
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-expiry-safety-window]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-expiry-safety-window[`+++quarkus.openid-ssf.receiver.oauth2.expiry-safety-window+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-expiry-safety-window]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-expiry-safety-window[`quarkus.openid-ssf.receiver.oauth2.expiry-safety-window`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.expiry-safety-window+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.expiry-safety-window+++`
+`quarkus.openid-ssf.receiver."transmitter-name".oauth2.expiry-safety-window`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oauth2.expiry-safety-window+++[]
 endif::add-copy-button-to-config-props[]
@@ -866,13 +866,13 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
 |`+++30S+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oidc-client-name]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oidc-client-name[`+++quarkus.openid-ssf.receiver.oidc.client-name+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oidc-client-name]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oidc-client-name[`quarkus.openid-ssf.receiver.oidc.client-name`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.oidc.client-name+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".oidc.client-name+++`
+`quarkus.openid-ssf.receiver."transmitter-name".oidc.client-name`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oidc.client-name+++[]
 endif::add-copy-button-to-config-props[]
@@ -892,13 +892,13 @@ endif::add-copy-button-to-env-var[]
 |string
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oidc-token-timeout]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oidc-token-timeout[`+++quarkus.openid-ssf.receiver.oidc.token-timeout+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oidc-token-timeout]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oidc-token-timeout[`quarkus.openid-ssf.receiver.oidc.token-timeout`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.oidc.token-timeout+++[]
 endif::add-copy-button-to-config-props[]
 
 
-`+++quarkus.openid-ssf.receiver."transmitter-name".oidc.token-timeout+++`
+`quarkus.openid-ssf.receiver."transmitter-name".oidc.token-timeout`
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".oidc.token-timeout+++[]
 endif::add-copy-button-to-config-props[]
@@ -919,7 +919,7 @@ endif::add-copy-button-to-env-var[]
 |`+++2S+++`
 
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-event-aliases-alias]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-event-aliases-alias[`+++quarkus.openid-ssf.receiver.event-aliases."alias"+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-event-aliases-alias]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-event-aliases-alias[`quarkus.openid-ssf.receiver.event-aliases."alias"`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.event-aliases."alias"+++[]
 endif::add-copy-button-to-config-props[]
@@ -948,7 +948,7 @@ endif::add-copy-button-to-env-var[]
 |Map<String,String>
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-endpoint-path]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-endpoint-path[`+++quarkus.openid-ssf.receiver.push.endpoint-path+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-endpoint-path]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-push-endpoint-path[`quarkus.openid-ssf.receiver.push.endpoint-path`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.push.endpoint-path+++[]
 endif::add-copy-button-to-config-props[]
@@ -969,7 +969,7 @@ endif::add-copy-button-to-env-var[]
 |string
 |`+++/ssf/push+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-connect-timeout]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-connect-timeout[`+++quarkus.openid-ssf.receiver.http.connect-timeout+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-connect-timeout]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-connect-timeout[`quarkus.openid-ssf.receiver.http.connect-timeout`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.http.connect-timeout+++[]
 endif::add-copy-button-to-config-props[]
@@ -990,7 +990,7 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
 |`+++5S+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-read-timeout]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-read-timeout[`+++quarkus.openid-ssf.receiver.http.read-timeout+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-read-timeout]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-read-timeout[`quarkus.openid-ssf.receiver.http.read-timeout`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.http.read-timeout+++[]
 endif::add-copy-button-to-config-props[]
@@ -1011,7 +1011,7 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
 |`+++5S+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-user-agent]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-user-agent[`+++quarkus.openid-ssf.receiver.http.user-agent+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-user-agent]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-user-agent[`quarkus.openid-ssf.receiver.http.user-agent`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.http.user-agent+++[]
 endif::add-copy-button-to-config-props[]
@@ -1032,7 +1032,7 @@ endif::add-copy-button-to-env-var[]
 |string
 |
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-enabled]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-enabled[`+++quarkus.openid-ssf.receiver.dedup.enabled+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-enabled]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-enabled[`quarkus.openid-ssf.receiver.dedup.enabled`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.dedup.enabled+++[]
 endif::add-copy-button-to-config-props[]
@@ -1053,7 +1053,7 @@ endif::add-copy-button-to-env-var[]
 |boolean
 |`+++true+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-capacity]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-capacity[`+++quarkus.openid-ssf.receiver.dedup.capacity+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-capacity]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-capacity[`quarkus.openid-ssf.receiver.dedup.capacity`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.dedup.capacity+++[]
 endif::add-copy-button-to-config-props[]
@@ -1074,7 +1074,7 @@ endif::add-copy-button-to-env-var[]
 |int
 |`+++10000+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-retention]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-retention[`+++quarkus.openid-ssf.receiver.dedup.retention+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-retention]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-retention[`quarkus.openid-ssf.receiver.dedup.retention`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.dedup.retention+++[]
 endif::add-copy-button-to-config-props[]
@@ -1095,7 +1095,7 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
 |`+++7D+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-enabled]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-enabled[`+++quarkus.openid-ssf.receiver.jdbc.enabled+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-enabled]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-enabled[`quarkus.openid-ssf.receiver.jdbc.enabled`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.jdbc.enabled+++[]
 endif::add-copy-button-to-config-props[]
@@ -1116,7 +1116,7 @@ endif::add-copy-button-to-env-var[]
 |boolean
 |`+++true+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-initialize-schema]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-initialize-schema[`+++quarkus.openid-ssf.receiver.jdbc.initialize-schema+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-initialize-schema]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-initialize-schema[`quarkus.openid-ssf.receiver.jdbc.initialize-schema`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.jdbc.initialize-schema+++[]
 endif::add-copy-button-to-config-props[]
@@ -1137,7 +1137,7 @@ endif::add-copy-button-to-env-var[]
 |boolean
 |`+++true+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-table-prefix]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-table-prefix[`+++quarkus.openid-ssf.receiver.jdbc.table-prefix+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-table-prefix]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-table-prefix[`quarkus.openid-ssf.receiver.jdbc.table-prefix`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.jdbc.table-prefix+++[]
 endif::add-copy-button-to-config-props[]
@@ -1158,7 +1158,7 @@ endif::add-copy-button-to-env-var[]
 |string
 |`+++EASYSSF_+++`
 
-a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-cleanup-interval]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-cleanup-interval[`+++quarkus.openid-ssf.receiver.jdbc.cleanup-interval+++`]##
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-cleanup-interval]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-cleanup-interval[`quarkus.openid-ssf.receiver.jdbc.cleanup-interval`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.jdbc.cleanup-interval+++[]
 endif::add-copy-button-to-config-props[]

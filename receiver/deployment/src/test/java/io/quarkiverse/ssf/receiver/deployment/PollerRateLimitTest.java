@@ -37,7 +37,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import com.nimbusds.jwt.SignedJWT;
 
 import io.quarkiverse.ssf.receiver.runtime.delivery.poll.SsfPollScheduler;
-import io.quarkus.test.QuarkusExtensionTest;
+import io.quarkus.test.QuarkusUnitTest;
 
 /**
  * A rate-limited poll endpoint (GH-13): a {@code 429} opens a pause driven by
@@ -53,7 +53,7 @@ import io.quarkus.test.QuarkusExtensionTest;
 public class PollerRateLimitTest {
 
     @RegisterExtension
-    static final QuarkusExtensionTest TEST = new QuarkusExtensionTest()
+    static final QuarkusUnitTest TEST = new QuarkusUnitTest()
             .setArchiveProducer(() -> TestTransmitters.archive(ThrottlingHttpClient.class))
             .setBeforeAllCustomizer(() -> {
                 TestTransmitter transmitter = TestTransmitters.start();

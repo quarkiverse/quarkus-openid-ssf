@@ -12,6 +12,7 @@ build-time processor.
 
 ### New
 
+- Built and tested against Quarkus 3.27.x (LTS); the floor moves from 3.35 to 3.27.
 - Several transmitters: `quarkus.openid-ssf.receiver.<name>.*` configures a further
   transmitter next to the default one, with its own stream, push authorization
   header, token provider and poller. `SsfTransmitters` gives them all.
