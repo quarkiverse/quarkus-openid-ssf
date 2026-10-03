@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 (unreleased)
+## 0.2.0
 
 The receiver is built on [easyssf](https://github.com/easyssf/easyssf)
 (`org.easyssf:easyssf-receiver`), the SSF receiver library shared with its Spring
@@ -20,6 +20,12 @@ build-time processor.
   `https`, or `http` on loopback addresses; this lifts the rule for test setups.
 - `set-validation.require-type-header` (SETs must be typed `secevent+jwt`) and
   `set-validation.clock-skew`.
+- `set-validation.subject-compatibility`: `strict-ssf-1-0` (the default) requires the
+  top-level `sub_id` claim of SSF 1.0, `legacy` accepts SETs of transmitters that
+  follow earlier drafts and put the subject into the event payload.
+- `understood-subject-members`: the members of a complex subject the application
+  interprets. A SET whose subject has a member the transmitter declared critical
+  (`critical_subject_members`) that is not listed is rejected as `invalid_request`.
 - `http.connect-timeout`, `http.read-timeout` and `http.user-agent` for all calls
   to the transmitters.
 - A JDBC de-duplication store over the default Agroal datasource (`jdbc.*`,
