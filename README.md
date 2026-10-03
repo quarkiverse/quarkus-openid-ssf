@@ -56,6 +56,7 @@ native image support.
 | [`receiver/runtime/`](receiver/runtime/) | Extension runtime: configuration, the producers that wire easyssf into CDI, push route, poll scheduler, token providers, metrics, health, JDBC, Dev UI service. |
 | [`receiver/deployment/`](receiver/deployment/) | Build-time processor: registers the beans, wires the optional integrations when their extension is present. Contains the tests, which run against easyssf's in-process `TestTransmitter`. |
 | [`receiver/examples/`](receiver/examples/) | Four runnable applications and a Keycloak setup, see the [examples README](receiver/examples/README.md). |
+| [`receiver/conformance/`](receiver/conformance/) | Receiver under test for the OpenID conformance suite and the tests that run its four SSF receiver plans against it, see the [conformance README](receiver/conformance/README.md). |
 
 ## Consumer SPI
 
