@@ -10,7 +10,7 @@
     </parent>
 
     <artifactId>quarkus-openid-ssf-receiver-example-resource-server</artifactId>
-    <packaging>quarkus</packaging>
+    <packaging>jar</packaging>
     <name>Quarkus OpenID SSF - Receiver - Example: Resource server</name>
     <description>OAuth2 resource server that rejects access tokens of sessions revoked in Keycloak</description>
 
@@ -70,6 +70,15 @@
                 <groupId>io.quarkus</groupId>
                 <artifactId>quarkus-maven-plugin</artifactId>
                 <extensions>true</extensions>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>build</goal>
+                            <goal>generate-code</goal>
+                            <goal>generate-code-tests</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>

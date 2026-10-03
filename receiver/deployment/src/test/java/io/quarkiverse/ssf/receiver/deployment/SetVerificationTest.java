@@ -15,7 +15,7 @@ import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.JWTClaimsSet;
 
-import io.quarkus.test.QuarkusExtensionTest;
+import io.quarkus.test.QuarkusUnitTest;
 import io.restassured.RestAssured;
 import io.restassured.config.EncoderConfig;
 import io.restassured.http.ContentType;
@@ -29,7 +29,7 @@ public class SetVerificationTest {
     private static final JOSEObjectType SECEVENT = new JOSEObjectType("secevent+jwt");
 
     @RegisterExtension
-    static final QuarkusExtensionTest TEST = new QuarkusExtensionTest()
+    static final QuarkusUnitTest TEST = new QuarkusUnitTest()
             .setArchiveProducer(() -> TestTransmitters.archive())
             .setBeforeAllCustomizer(() -> {
                 TestTransmitter transmitter = TestTransmitters.start();

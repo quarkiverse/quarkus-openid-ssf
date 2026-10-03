@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import io.quarkiverse.ssf.receiver.runtime.stream.SsfReceiverStreamClient;
-import io.quarkus.test.QuarkusExtensionTest;
+import io.quarkus.test.QuarkusUnitTest;
 import io.restassured.RestAssured;
 import io.restassured.config.EncoderConfig;
 import io.restassured.http.ContentType;
@@ -41,7 +41,7 @@ public class NamedTransmittersTest {
     private static final String SECOND = "second";
 
     @RegisterExtension
-    static final QuarkusExtensionTest TEST = new QuarkusExtensionTest()
+    static final QuarkusUnitTest TEST = new QuarkusUnitTest()
             .setArchiveProducer(() -> TestTransmitters.archive(CapturingHandler.class))
             .setBeforeAllCustomizer(() -> {
                 TestTransmitters.addPushStream(TestTransmitters.DEFAULT, TestTransmitters.start());

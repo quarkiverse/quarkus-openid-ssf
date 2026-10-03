@@ -35,9 +35,9 @@
         -->
         <maven.compiler.release>21</maven.compiler.release>
 
-        <quarkus.version>3.35.2</quarkus.version>
+        <quarkus.version>3.27.6</quarkus.version>
         <!-- The protocol implementation shared with the Spring Boot starter. -->
-        <easyssf.version>0.0.1-SNAPSHOT</easyssf.version>
+        <easyssf.version>0.1.0-SNAPSHOT</easyssf.version>
         <sundrio.version>0.300.0</sundrio.version>
 
         <!-- Surefire's @{argLine} placeholder for plugin chaining (Jacoco etc). -->

@@ -20,7 +20,9 @@ import io.quarkus.oidc.OidcTenantConfig;
 import io.quarkus.oidc.TokenStateManager;
 import io.quarkus.oidc.runtime.DefaultTokenStateManager;
 import io.quarkus.oidc.runtime.OidcUtils;
+import io.quarkus.oidc.runtime.TenantConfigContext;
 import io.quarkus.security.AuthenticationFailedException;
+import io.smallrye.jwt.algorithm.KeyEncryptionAlgorithm;
 import io.smallrye.mutiny.Uni;
 import io.vertx.ext.web.RoutingContext;
 
@@ -77,7 +79,17 @@ public class RevocationAwareTokenStateManager implements TokenStateManager {
     private static String idToken(RoutingContext routingContext, OidcTenantConfig oidcConfig,
             AuthorizationCodeTokens tokens) {
         if (oidcConfig.tokenStateManager().encryptionRequired()) {
-            return OidcUtils.decryptToken(tokens.getIdToken(), routingContext, oidcConfig);
+            // The tokens are encrypted the way DefaultTokenStateManager encrypts them:
+            // with the session cookie key of the tenant, which the OIDC mechanism puts
+            // into the routing context, and the configured key encryption algorithm.
+            TenantConfigContext tenant = routingContext.get(TenantConfigContext.class.getName());
+            try {
+                KeyEncryptionAlgorithm algorithm = KeyEncryptionAlgorithm
+                        .valueOf(oidcConfig.tokenStateManager().encryptionAlgorithm().name());
+                return OidcUtils.decryptString(tokens.getIdToken(), tenant.getSessionCookieEncryptionKey(), algorithm);
+            } catch (Exception e) {
+                throw new AuthenticationFailedException(e);
+            }
         }
         return tokens.getIdToken();
     }

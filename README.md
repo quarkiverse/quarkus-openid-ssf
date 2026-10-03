@@ -23,7 +23,7 @@ native image support.
 | **Status** | Experimental, APIs may change before 1.0. |
 | **License** | [Apache-2.0](LICENSE) |
 | **Java** | 21+ (extension and examples both compile under `--release 21`) |
-| **Quarkus** | 3.35.x (floor, see [Compatibility](#compatibility)) |
+| **Quarkus** | 3.27.x (floor, see [Compatibility](#compatibility)) |
 | **Group ID** | `io.quarkiverse.openid-ssf` |
 | **Receiver artifact** | `quarkus-openid-ssf-receiver` |
 
@@ -368,7 +368,7 @@ of a mock server; see `ResourceServerTest` in the resource server example for a
 
 | | Tested | Floor | Notes |
 |---|---|---|---|
-| **Quarkus** | 3.35.x | 3.35.0 | Earlier versions may work but aren't tested. CI matrix in `.github/workflows/build.yml` is the source of truth. |
+| **Quarkus** | 3.27.x | 3.27.0 | Earlier versions may work but aren't tested. CI matrix in `.github/workflows/build.yml` is the source of truth. |
 | **Java (extension)** | 21, 25 | 21 | The runtime + deployment artifacts compile under `--release 21`. Consumers may run on any 21+. |
 | **Java (examples)** | 21 | 21 | Examples inherit the same Java 21 floor so they're copy-pasteable for consumers. |
 | **Native image** | GraalVM 21 (Mandrel-equivalent) | — | The native CI workflow builds the examples and runs the integration tests of the resource server and the receiver-managed example against the native binaries. |

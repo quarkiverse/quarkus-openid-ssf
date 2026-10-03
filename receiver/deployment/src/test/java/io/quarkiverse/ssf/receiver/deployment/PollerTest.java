@@ -39,7 +39,7 @@ import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jwt.SignedJWT;
 
 import io.quarkiverse.ssf.receiver.runtime.delivery.poll.SsfPollScheduler;
-import io.quarkus.test.QuarkusExtensionTest;
+import io.quarkus.test.QuarkusUnitTest;
 
 /**
  * POLL delivery (RFC 8936) driven synchronously with {@link SsfPollScheduler#pollNow()}
@@ -50,7 +50,7 @@ import io.quarkus.test.QuarkusExtensionTest;
 public class PollerTest {
 
     @RegisterExtension
-    static final QuarkusExtensionTest TEST = new QuarkusExtensionTest()
+    static final QuarkusUnitTest TEST = new QuarkusUnitTest()
             .setArchiveProducer(() -> TestTransmitters.archive(CapturingHandler.class))
             .setBeforeAllCustomizer(() -> {
                 TestTransmitter transmitter = TestTransmitters.start();

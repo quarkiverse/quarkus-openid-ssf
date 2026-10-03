@@ -16,7 +16,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 import io.quarkiverse.ssf.receiver.runtime.delivery.poll.SsfPollScheduler;
 import io.quarkiverse.ssf.receiver.runtime.stream.SsfReceiverStreamClient;
-import io.quarkus.test.QuarkusExtensionTest;
+import io.quarkus.test.QuarkusUnitTest;
 
 /**
  * {@code quarkus.openid-ssf.receiver.enabled=false}: the application starts without any
@@ -26,7 +26,7 @@ import io.quarkus.test.QuarkusExtensionTest;
 public class EnabledFalseTest {
 
     @RegisterExtension
-    static final QuarkusExtensionTest TEST = new QuarkusExtensionTest()
+    static final QuarkusUnitTest TEST = new QuarkusUnitTest()
             .setArchiveProducer(() -> ShrinkWrap.create(JavaArchive.class))
             .overrideConfigKey("quarkus.openid-ssf.receiver.enabled", "false");
 
