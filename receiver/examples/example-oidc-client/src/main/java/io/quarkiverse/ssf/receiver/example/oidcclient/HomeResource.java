@@ -55,9 +55,15 @@ public class HomeResource {
                         fetch("/auth/check", { headers: { "Accept": "application/json" }, cache: "no-store",
                                                credentials: "same-origin", redirect: "manual" })
                             .then(function (response) {
-                                if (response.status !== 200) {
+                                // 401/403, or a redirect to the login (an opaque response): the session is gone
+                                if (response.type === "opaqueredirect" || response.status === 0
+                                        || response.status === 401 || response.status === 403) {
                                     status.textContent = "Session check: session ended, redirecting to the login";
                                     window.location.reload();
+                                    return;
+                                }
+                                if (response.status !== 200) {
+                                    status.textContent = "Session check: failed with status " + response.status;
                                     return;
                                 }
                                 checks++;
