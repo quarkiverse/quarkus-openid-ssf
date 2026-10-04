@@ -8,6 +8,7 @@ https://openid.net/specs/openid-sharedsignals-framework-1_0.html[OpenID
 Shared Signals Framework (SSF)] and its companion specs
 (https://openid.net/specs/openid-caep-1_0-final.html[CAEP],
 https://openid.net/specs/openid-risc-1_0-final.html[RISC],
+https://www.rfc-editor.org/rfc/rfc9967[RFC 9967 SCIM Events],
 https://www.rfc-editor.org/rfc/rfc8417[RFC 8417 Security Event Tokens],
 https://www.rfc-editor.org/rfc/rfc8935[RFC 8935 PUSH delivery],
 https://www.rfc-editor.org/rfc/rfc8936[RFC 8936 POLL delivery],

@@ -90,9 +90,11 @@ public interface SsfTransmitterConfig {
 
     /**
      * Event types this receiver wants to subscribe to, as a full URI or an alias (the
-     * built-in {@code CaepSessionRevoked}, {@code RiscAccountDisabled}, ... or one of
-     * {@code event-aliases}). Required for a stream managed by the receiver, where it
-     * becomes {@code events_requested}; informational for a transmitter-managed one.
+     * built-in aliases of the SSF, CAEP, RISC and SCIM event types,
+     * {@code CaepSessionRevoked}, {@code RiscAccountDisabled}, {@code ScimProvCreateFull},
+     * ... or one of {@code event-aliases}). Required for a stream managed by the
+     * receiver, where it becomes {@code events_requested}; informational for a
+     * transmitter-managed one.
      */
     Optional<List<String>> eventsRequested();
 
