@@ -1,0 +1,203 @@
+# Requests for the SCIM provisioning example (IntelliJ IDEA / JetBrains HTTP Client).
+#
+# Prerequisites: the example is running,
+#   mvn -pl receiver/examples/example-scim-provisioning quarkus:dev
+# It starts a demo SCIM service provider under /demo/scim: every request to it transmits a SCIM Event
+# (RFC 9967) that the receiver of the application polls every two seconds and mirrors into /users.
+# Each response is the SET that was transmitted, as the compact JWT and its decoded claims.
+# Start with -Ddemo.autoplay=false to begin with an empty directory, otherwise the two users of the
+# scripted demo are there as well.
+# Run the requests from top to bottom.
+
+@app = http://localhost:8083
+@scim = {{app}}/demo/scim
+
+# ==============================================================================
+# The life of a user
+# ==============================================================================
+
+### 0 The directory before
+GET {{app}}/users
+
+### 1.1 Create carol at the service provider: feed:add + prov:create:full in one SET
+POST {{scim}}/Users
+Content-Type: application/json
+
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+  "externalId": "carol",
+  "userName": "carol",
+  "name": {"givenName": "Carol", "familyName": "Clark"},
+  "emails": [{"type": "work", "value": "carol@example.com", "primary": true}],
+  "active": true
+}
+
+> {%
+    client.test("the SET was transmitted", () => client.assert(response.status === 201));
+    client.test("the subject is the SCIM resource", () => client.assert(response.body.claims.sub_id.format === "scim"));
+    client.global.set("carol", response.body.claims.sub_id.uri.split("/").pop());
+%}
+
+### 1.2 The receiver has polled the SET and mirrored the user
+< {%
+    // the receiver polls every two seconds
+    const until = Date.now() + 3000;
+    while (Date.now() < until) {
+    }
+%}
+GET {{app}}/users/{{carol}}
+
+> {%
+    client.test("carol is in the directory", () => client.assert(response.status === 200));
+    client.test("with her display name from name.givenName and name.familyName", () => client.assert(response.body.displayName === "Carol Clark"));
+    client.test("and the version of the create event", () => client.assert(response.body.version === "1"));
+%}
+
+### 2.1 Modify carol with a SCIM PATCH: prov:patch:full carries the PatchOp as data
+PATCH {{scim}}/Users/{{carol}}
+Content-Type: application/json
+
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {"op": "replace", "path": "displayName", "value": "Carol Clark-Davis"},
+    {"op": "add", "path": "emails", "value": [
+      {"type": "work", "value": "carol@example.com"},
+      {"type": "home", "value": "carol.davis@home.example"}
+    ]}
+  ]
+}
+
+### 2.2 The directory has the patched user
+< {%
+    const until = Date.now() + 3000;
+    while (Date.now() < until) {
+    }
+%}
+GET {{app}}/users/{{carol}}
+
+> {%
+    client.test("the display name changed", () => client.assert(response.body.displayName === "Carol Clark-Davis"));
+    client.test("the second email was added", () => client.assert(response.body.emails.length === 2));
+    client.test("the version advanced", () => client.assert(response.body.version === "2"));
+%}
+
+### 3.1 A notice: prov:patch:notice names the attributes that changed but carries no data
+# The application logs it; a real one would GET the resource from the service provider.
+PATCH {{scim}}/Users/{{carol}}?mode=notice
+Content-Type: application/json
+
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {"op": "replace", "path": "phoneNumbers", "value": [{"type": "work", "value": "+1 555 0100"}]}
+  ]
+}
+
+> {%
+    client.test("the event lists the attributes only", () => {
+        const event = response.body.claims.events["urn:ietf:params:scim:event:prov:patch:notice"];
+        client.assert(event.attributes[0] === "phoneNumbers" && event.data === undefined);
+    });
+%}
+
+### 3.2 Nothing changed in the directory
+< {%
+    const until = Date.now() + 3000;
+    while (Date.now() < until) {
+    }
+%}
+GET {{app}}/users/{{carol}}
+
+> {%
+    client.test("the user is unchanged", () => client.assert(response.body.version === "2"));
+%}
+
+### 4.1 Deactivate carol: prov:deactivate
+POST {{scim}}/Users/{{carol}}/deactivate
+
+### 4.2 The user is inactive
+< {%
+    const until = Date.now() + 3000;
+    while (Date.now() < until) {
+    }
+%}
+GET {{app}}/users/{{carol}}
+
+> {%
+    client.test("carol is inactive", () => client.assert(response.body.active === false));
+%}
+
+### 5.1 Activate her again: prov:activate
+POST {{scim}}/Users/{{carol}}/activate
+
+### 5.2 The user is active
+< {%
+    const until = Date.now() + 3000;
+    while (Date.now() < until) {
+    }
+%}
+GET {{app}}/users/{{carol}}
+
+> {%
+    client.test("carol is active", () => client.assert(response.body.active === true));
+%}
+
+### 6.1 Replace carol with SCIM PUT: prov:put:full carries the new representation
+PUT {{scim}}/Users/{{carol}}
+Content-Type: application/json
+
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+  "userName": "cdavis",
+  "displayName": "Carol Davis",
+  "emails": [{"type": "work", "value": "carol.davis@example.com"}],
+  "active": true
+}
+
+### 6.2 The directory has the replaced user
+< {%
+    const until = Date.now() + 3000;
+    while (Date.now() < until) {
+    }
+%}
+GET {{app}}/users/{{carol}}
+
+> {%
+    client.test("the user was replaced", () => client.assert(response.body.userName === "cdavis" && response.body.emails.length === 1));
+%}
+
+### 7.1 Delete carol: prov:delete
+DELETE {{scim}}/Users/{{carol}}
+
+### 7.2 The user is gone: 404
+< {%
+    const until = Date.now() + 3000;
+    while (Date.now() < until) {
+    }
+%}
+GET {{app}}/users/{{carol}}
+
+> {%
+    client.test("carol was removed", () => client.assert(response.status === 404));
+%}
+
+# ==============================================================================
+# Looking around
+# ==============================================================================
+
+### The directory
+GET {{app}}/users
+
+### The SETs the demo service provider transmitted, oldest first: compact JWT and decoded claims
+# Note sub_id (format scim, the relative uri of the resource, the externalId), the events claim keyed
+# by event type URI, the txn that would group the SETs of one transaction, and the audience the
+# transmitter assigned to the stream.
+GET {{scim}}/events
+
+### A SET before the receiver registered its stream is refused: 503
+# (only right after startup; afterwards this request creates a user)
+POST {{scim}}/Users
+Content-Type: application/json
+
+{"userName": "dave"}
