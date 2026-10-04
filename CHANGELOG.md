@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3.0 (unreleased)
+
+### New
+
+- SCIM Events (RFC 9967) via easyssf 0.2.0: the event types under
+  `urn:ietf:params:scim:event:` with the built-in aliases `ScimFeedAdd`,
+  `ScimFeedRemove`, `ScimProvCreateNotice`, `ScimProvCreateFull`,
+  `ScimProvPatchNotice`, `ScimProvPatchFull`, `ScimProvPutNotice`, `ScimProvPutFull`,
+  `ScimProvDelete`, `ScimProvActivate`, `ScimProvDeactivate` and
+  `ScimMiscAsyncResponse`, the `scim` subject identifier, `SsfScimEvent` for the
+  typed payload and `SsfScimEventHandler`, which dispatches the SCIM Events of a
+  SET to a method per operation. Nothing has to be configured.
+- `example-scim-provisioning`: mirrors SCIM `Users` into a local directory with
+  `SsfScimEventHandler`, driven by a demo SCIM service provider over easyssf's
+  `TestTransmitter`, because Keycloak does not emit SCIM Events.
+
+### Changed
+
+- easyssf 0.2.0.
+
 ## 0.2.0
 
 The receiver is built on [easyssf](https://github.com/easyssf/easyssf)
