@@ -255,7 +255,7 @@ endif::add-copy-button-to-config-props[]
 
 [.description]
 --
-Event types this receiver wants to subscribe to, as a full URI or an alias (the built-in `CaepSessionRevoked`, `RiscAccountDisabled`, ... or one of `event-aliases`). Required for a stream managed by the receiver, where it becomes `events_requested`; informational for a transmitter-managed one.
+Event types this receiver wants to subscribe to, as a full URI or an alias (the built-in aliases of the SSF, CAEP, RISC and SCIM event types, `CaepSessionRevoked`, `RiscAccountDisabled`, `ScimProvCreateFull`, ... or one of `event-aliases`). Required for a stream managed by the receiver, where it becomes `events_requested`; informational for a transmitter-managed one.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -961,7 +961,7 @@ quarkus.openid-ssf.receiver.event-aliases.AcmeLogin=https://events.acme.example/
 
 
 
-They add to the built-in aliases of the SSF, CAEP and RISC event types (for example `CaepSessionRevoked`, `RiscAccountDisabled`) and cannot redefine one; a conflicting alias fails the start.
+They add to the built-in aliases of the SSF, CAEP, RISC and SCIM event types (for example `CaepSessionRevoked`, `RiscAccountDisabled`, `ScimProvCreateFull`) and cannot redefine one; a conflicting alias fails the start.
 
 
 ifdef::add-copy-button-to-env-var[]

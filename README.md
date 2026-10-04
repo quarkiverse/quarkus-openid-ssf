@@ -74,8 +74,9 @@ public class MyHandler implements SsfEventHandler {
         SsfEventToken eventToken = eventContext.eventToken();
         // RFC 8417 + SSF profile fields: jti(), iss(), iat(), aud(), events(), subjectId(), txn(), claims()
 
-        // Aliases and URIs are interchangeable; the SSF, CAEP and RISC event types
-        // have built-in aliases (CaepSessionRevoked, RiscAccountDisabled, ...).
+        // Aliases and URIs are interchangeable; the SSF, CAEP, RISC and SCIM event
+        // types have built-in aliases (CaepSessionRevoked, RiscAccountDisabled,
+        // ScimProvCreateFull, ...).
         if (eventContext.hasEvent("CaepSessionRevoked")) {
             SsfSubject subject = eventContext.subjectFor("CaepSessionRevoked");
             // subject.subject(), subject.sessionId(), subject.email(), ...
@@ -142,7 +143,7 @@ quarkus.openid-ssf.receiver.transmitter-issuer=https://transmitter.example
 quarkus.openid-ssf.receiver.delivery-method=PUSH                               # or POLL
 quarkus.openid-ssf.receiver.push.delivery-endpoint-url=https://my-app.example/ssf/push
 quarkus.openid-ssf.receiver.push.expected-auth-header=Bearer ${PUSH_SHARED_SECRET}
-# Built-in CAEP / RISC aliases work directly; full URIs are also accepted.
+# Built-in CAEP / RISC / SCIM aliases work directly; full URIs are also accepted.
 quarkus.openid-ssf.receiver.events-requested=CaepSessionRevoked,CaepCredentialChange
 # How the receiver authenticates at the stream management (and poll) endpoints
 quarkus.openid-ssf.receiver.oauth2.token-endpoint=https://transmitter.example/oauth/token
@@ -324,14 +325,15 @@ failed.
 ## Event type aliases
 
 Wherever an event type is named (`events-requested`, handlers, metric tags, logs)
-an alias can stand for the URI. The SSF, CAEP and RISC event types have built-in
-aliases:
+an alias can stand for the URI. The SSF, CAEP, RISC and SCIM event types have
+built-in aliases:
 
-| Spec | URI suffix (under `…/secevent/<spec>/event-type/`) | Aliases |
+| Spec | URI suffix (under `https://schemas.openid.net/secevent/<spec>/event-type/`, for SCIM under `urn:ietf:params:scim:event:`) | Aliases |
 |---|---|---|
 | **OpenID SSF 1.0** | `verification`, `stream-updated` | `SsfStreamVerification`, `SsfStreamUpdated` |
 | [**OpenID CAEP 1.0**](https://openid.net/specs/openid-caep-1_0-final.html) | `session-revoked`, `token-claims-change`, `credential-change`, `assurance-level-change`, `device-compliance-change`, `session-established`, `session-presented`, `risk-level-change` | `CaepSessionRevoked`, `CaepTokenClaimsChange`, `CaepCredentialChange`, `CaepAssuranceLevelChange`, `CaepDeviceComplianceChange`, `CaepSessionEstablished`, `CaepSessionPresented`, `CaepRiskLevelChange` |
 | [**OpenID RISC 1.0**](https://openid.net/specs/openid-risc-1_0-final.html) | `account-credential-change-required`, `account-purged`, `account-disabled`, `account-enabled`, `identifier-changed`, `identifier-recycled`, `credential-compromise`, `opt-in`, `opt-out-initiated`, `opt-out-cancelled`, `opt-out-effective`, `recovery-activated`, `recovery-information-changed` | `RiscAccountCredentialChangeRequired`, `RiscAccountPurged`, `RiscAccountDisabled`, `RiscAccountEnabled`, `RiscIdentifierChanged`, `RiscIdentifierRecycled`, `RiscCredentialCompromise`, `RiscOptIn`, `RiscOptOutInitiated`, `RiscOptOutCancelled`, `RiscOptOutEffective`, `RiscRecoveryActivated`, `RiscRecoveryInformationChanged` |
+| [**SCIM Events (RFC 9967)**](https://www.rfc-editor.org/rfc/rfc9967) | `feed:add`, `feed:remove`, `prov:create:notice`, `prov:create:full`, `prov:patch:notice`, `prov:patch:full`, `prov:put:notice`, `prov:put:full`, `prov:delete`, `prov:activate`, `prov:deactivate`, `misc:asyncresp` | `ScimFeedAdd`, `ScimFeedRemove`, `ScimProvCreateNotice`, `ScimProvCreateFull`, `ScimProvPatchNotice`, `ScimProvPatchFull`, `ScimProvPutNotice`, `ScimProvPutFull`, `ScimProvDelete`, `ScimProvActivate`, `ScimProvDeactivate`, `ScimMiscAsyncResponse` |
 
 Vendor specific event types get their aliases from configuration; an alias cannot
 redefine a built-in one, a conflict fails the start:
@@ -355,6 +357,57 @@ interprets others, or fewer, list them:
 ```properties
 quarkus.openid-ssf.receiver.understood-subject-members=user,session,tenant,workspace
 ```
+
+## SCIM Events (RFC 9967)
+
+[SCIM Events](https://www.rfc-editor.org/rfc/rfc9967) tell a receiver about the
+resources of a SCIM service provider: a user was created, patched, replaced,
+deleted, activated or deactivated, or joined or left the event feed. They are SETs
+like the CAEP and RISC events, with the event types under
+`urn:ietf:params:scim:event:` and a `scim` subject identifier that names the
+resource by its relative `uri` (`/Users/2b2f880a…`) and, if known, its
+`externalId`. Nothing has to be configured: the aliases resolve wherever an event
+type is named, and the verification is the one of every SET.
+
+easyssf parses them: `SsfScimEvent` gives typed access to the payload (`data` of
+a `full` event, the modified `attributes` of a `notice` event, the ETag `version`,
+the fields of an asynchronous response), `SsfScimSubject` to the resource
+(`uri()`, `resourceType()`, `id()`, `externalId()`). A bean extending
+`SsfScimEventHandler` is an `SsfEventHandler` that gets every SCIM Event of a SET
+dispatched to the method of its operation:
+
+```java
+import org.easyssf.core.scim.SsfScimEvent;
+import org.easyssf.receiver.event.SsfEventContext;
+import org.easyssf.receiver.scim.SsfScimEventHandler;
+
+@Singleton
+public class ProvisioningHandler extends SsfScimEventHandler {
+    @Override
+    protected void onCreate(SsfScimEvent event, SsfEventContext eventContext) {
+        if (event.isFull() && "Users".equals(event.subject().resourceType())) {
+            users.create(event.subject().id(), event.data());
+        }
+    }
+
+    @Override
+    protected void onDeactivate(SsfScimEvent event, SsfEventContext eventContext) {
+        users.disable(event.subject().id());
+    }
+}
+```
+
+```properties
+quarkus.openid-ssf.receiver.events-requested=ScimProvCreateFull,ScimProvPatchFull,ScimProvDelete,ScimProvDeactivate
+```
+
+A `notice` event carries no data: the application fetches the resource from the
+SCIM service provider with a GET of the subject's `uri`, which is outside of the
+extension. The example
+[`example-scim-provisioning`](receiver/examples/example-scim-provisioning) mirrors
+SCIM `Users` into a local directory. Note that a `scim` subject has neither `sid`
+nor `sub`: easyssf's `SsfTokenRevocationEventHandler` of the resource server and
+OIDC client examples logs a warning for such a SET and revokes nothing.
 
 ## Disable switch
 
@@ -414,4 +467,8 @@ semantics.
   right after a SET was handled, a SET that was not acknowledged is delivered
   again by the transmitter.
 - Per-event-type CAEP / RISC parsing beyond the subject: `SsfEventContext`
-  exposes the raw event payloads, consumers parse what they care about.
+  exposes the raw event payloads, consumers parse what they care about. SCIM
+  Events are the exception, see [SCIM Events](#scim-events-rfc-9967).
+- Calling the SCIM service provider: fetching the resource after a `notice`
+  event, asynchronous SCIM requests and the `Set-Txn` header are left to the
+  application.

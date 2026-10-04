@@ -67,9 +67,10 @@ public interface SsfReceiverConfig {
      * </pre>
      *
      * <p>
-     * They add to the built-in aliases of the SSF, CAEP and RISC event types (for
-     * example {@code CaepSessionRevoked}, {@code RiscAccountDisabled}) and cannot
-     * redefine one; a conflicting alias fails the start.
+     * They add to the built-in aliases of the SSF, CAEP, RISC and SCIM event types
+     * (for example {@code CaepSessionRevoked}, {@code RiscAccountDisabled},
+     * {@code ScimProvCreateFull}) and cannot redefine one; a conflicting alias fails
+     * the start.
      */
     @ConfigDocMapKey("alias")
     Map<String, String> eventAliases();

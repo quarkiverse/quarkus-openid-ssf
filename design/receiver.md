@@ -33,7 +33,8 @@ conformance suite results of easyssf.
 | Dedup | `SsfJtiDedupStore`, `InMemorySsfJtiDedupStore`, `JdbcSsfJtiDedupStore` (`easyssf-receiver-jdbc`) | producers: in-memory, or JDBC over the default Agroal datasource with schema creation and cleanup |
 | Metrics | `SsfReceiverMetrics`, `MicrometerSsfReceiverMetrics` | registered when `quarkus-micrometer` is present, plus the dedup size gauge |
 | Health | `SsfStreamRegistrar.getState()`, `SsfPoller.getLast*()` | `SsfReceiverHealthCheck` (`@Wellness`) when `quarkus-smallrye-health` is present |
-| Aliases | `SsfEventTypes` (built-in SSF, CAEP, RISC aliases, `registerAlias`) | `event-aliases.*` registered at startup |
+| Aliases | `SsfEventTypes` (built-in SSF, CAEP, RISC, SCIM aliases, `registerAlias`) | `event-aliases.*` registered at startup |
+| SCIM Events | `SsfScimEvent`, `SsfScimSubject`, `SsfScimOperation` (easyssf-core), `SsfScimEventHandler` (easyssf-receiver) | nothing: a bean extending `SsfScimEventHandler` is an `SsfEventHandler`; `example-scim-provisioning` |
 | Dev UI | | `SsfDevJsonRpcService` and two pages |
 | Tests | `easyssf-test`: `TestTransmitter` | `QuarkusExtensionTest`s in `receiver/deployment`, see below |
 
