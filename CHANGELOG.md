@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.3.0 (unreleased)
+## 0.3.0
+
+SCIM Events (RFC 9967) through easyssf 0.2.0: a SET that reports a change of a
+SCIM resource is verified like any other, its event types have aliases, and
+`SsfScimEventHandler` hands the events to a method per operation. A new example
+mirrors SCIM users into a local directory. Nothing changes for existing
+applications.
 
 ### New
 
