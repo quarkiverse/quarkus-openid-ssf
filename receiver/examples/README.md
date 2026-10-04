@@ -1,6 +1,6 @@
 # Examples
 
-Four applications that use the `quarkus-openid-ssf-receiver` extension.
+Five applications that use the `quarkus-openid-ssf-receiver` extension.
 
 | | Port | |
 |---|---|---|
@@ -9,6 +9,7 @@ Four applications that use the `quarkus-openid-ssf-receiver` extension.
 | [`example-oidc-client/`](example-oidc-client) | 8082 | Web application with OIDC login (`quarkus-oidc`). Ends the local session once the Keycloak session was revoked or the user's credentials changed. |
 | [`example-receiver-managed-stream/`](example-receiver-managed-stream) | 28080 | Developer aid without login: exposes what it received and the stream management API over REST. Profiles for [caep.dev](https://ssf.caep.dev) and Keycloak, PUSH and POLL. |
 | [`example-transmitter-managed-stream/`](example-transmitter-managed-stream) | 28080 | Like the one above, for a stream an operator created at the transmitter (`stream-management=TRANSMITTER` with a `stream-id`). |
+| [`example-scim-provisioning/`](example-scim-provisioning) | 8083 | Mirrors SCIM `Users` into a local directory from SCIM Events (RFC 9967). Runs without Keycloak, see [5.](#5-scim-provisioning) |
 
 The resource server and the OIDC client contain no SSF specific code apart from configuration, a
 few lines that reject revoked tokens (a `SecurityIdentityAugmentor` in the resource server, a
@@ -80,7 +81,9 @@ CaepSessionRevoked: revoked access tokens of session hPB29fvO…
 How it works: `TokenRevocation` produces easyssf's `SsfTokenRevocationEventHandler`, which records
 the session of every `CaepSessionRevoked` event in an `SsfTokenRevocationStore`, and implements a
 `SecurityIdentityAugmentor` that fails the authentication of an access token whose session is in
-the store.
+the store. The handler needs a subject with a `sid` or `sub`: for a SET with a `scim` subject
+(RFC 9967, see [5.](#5-scim-provisioning)) it logs a warning and revokes nothing, which is right
+for a resource server that validates access tokens.
 
 ### Metrics and health
 
@@ -160,6 +163,100 @@ Other things to try:
   sessions of the user end (`session-revoked` for the user, `credential-change`).
 - *Log out here* in the application logs the user out of Keycloak as well (RP-initiated logout),
   Keycloak then sends a `session-revoked` event for that session to both applications.
+
+## 5. SCIM provisioning
+
+Keycloak does not emit SCIM Events (RFC 9967), so this example does not need it. The application
+starts a demo SCIM service provider over easyssf's `TestTransmitter` and points its receiver at it.
+Once the receiver has registered its stream, the demo tells the life of two users, one SET every
+few seconds, and logs every SET decoded; the receiver polls the SETs and mirrors the users into a
+local directory (`/users`) with a handler that extends `SsfScimEventHandler`.
+
+```sh
+mvn -pl receiver/examples/example-scim-provisioning quarkus:dev
+```
+
+```
+Demo SCIM service provider transmits at http://127.0.0.1:52174/realms/test
+Created SSF stream 3f0d…  (delivery urn:ietf:rfc:8936 http://127.0.0.1:52174/realms/test/poll, events [ScimFeedAdd, …], audience [receiver/3f0d…])
+The receiver registered its stream, the demo SCIM service provider starts
+
+### Alice is created at the service provider and joins the feed: feed:add and prov:create:full in one SET, with her representation as data
+Transmitted SET 2c6a… with [ScimFeedAdd, ScimProvCreateFull] for /Users/2b2f880af6674ac284bae9381673d462:
+{
+  "iss" : "http://127.0.0.1:52174/realms/test",
+  "sub_id" : { "format" : "scim", "uri" : "/Users/2b2f880af6674ac284bae9381673d462", "externalId" : "alice" },
+  "events" : { "urn:ietf:params:scim:event:feed:add" : { }, "urn:ietf:params:scim:event:prov:create:full" : { … } },
+  …
+}
+ScimFeedAdd: /Users/2b2f880af6674ac284bae9381673d462 joined the feed
+ScimProvCreateFull: created User[id=2b2f880af6674ac284bae9381673d462, externalId=alice, userName=alice, displayName=Alice Adams, emails=[alice@example.com], active=true, version=1]
+ScimProvPatchFull: patched User[…, displayName=Alice Baker, emails=[alice@example.com, alice.baker@home.example], …, version=2]
+ScimProvPatchNotice: /Users/2b2f880a… modified, changed [phoneNumbers]; a notice event has no data, the application would GET the resource from the SCIM service provider
+ScimProvDeactivate: deactivated User[…, active=false, version=4]
+ScimProvDelete: deleted User[id=c3a6e1f0…, userName=robert, …]
+```
+
+```sh
+curl -s localhost:8083/users | jq
+```
+
+### Walk through it yourself
+
+The demo service provider is a tiny stand-in for the `/Users` endpoint of a SCIM server. Every
+request to `/demo/scim/Users` transmits the SCIM Event about the change, the receiver mirrors it
+on its next poll. Start with `-Ddemo.autoplay=false` to begin with an empty directory. Create,
+patch, deactivate and delete a user at the service provider and watch the directory:
+
+```sh
+APP=http://localhost:8083
+
+# create: feed:add + prov:create:full in one SET, the response is the SET as transmitted
+CAROL=$(curl -s -X POST $APP/demo/scim/Users -H 'Content-Type: application/json' \
+  -d '{"externalId":"carol","userName":"carol","name":{"givenName":"Carol","familyName":"Clark"},"emails":[{"value":"carol@example.com"}]}' \
+  | jq -r '.claims.sub_id.uri | split("/") | last')
+sleep 2; curl -s $APP/users/$CAROL | jq
+
+# patch: prov:patch:full carries the PatchOp as data
+curl -s -X PATCH $APP/demo/scim/Users/$CAROL -H 'Content-Type: application/json' \
+  -d '{"Operations":[{"op":"replace","path":"displayName","value":"Carol Clark-Davis"}]}' > /dev/null
+sleep 2; curl -s $APP/users/$CAROL | jq .displayName
+
+# a notice names the changed attributes but carries no data: logged, the directory is unchanged
+curl -s -X PATCH "$APP/demo/scim/Users/$CAROL?mode=notice" -H 'Content-Type: application/json' \
+  -d '{"Operations":[{"op":"replace","path":"phoneNumbers","value":[{"value":"+1 555 0100"}]}]}' > /dev/null
+
+# deactivate, activate, replace, delete
+curl -s -X POST $APP/demo/scim/Users/$CAROL/deactivate > /dev/null; sleep 2; curl -s $APP/users/$CAROL | jq .active
+curl -s -X POST $APP/demo/scim/Users/$CAROL/activate > /dev/null
+curl -s -X PUT $APP/demo/scim/Users/$CAROL -H 'Content-Type: application/json' \
+  -d '{"userName":"cdavis","displayName":"Carol Davis","emails":[{"value":"carol.davis@example.com"}],"active":true}' > /dev/null
+curl -s -X DELETE $APP/demo/scim/Users/$CAROL > /dev/null; sleep 2; curl -i -s $APP/users/$CAROL | head -1    # 404
+
+# the SETs the demo service provider transmitted, decoded
+curl -s $APP/demo/scim/events | jq
+```
+
+[`example-scim-provisioning.http`](example-scim-provisioning/example-scim-provisioning.http) runs
+the same life of a user with the HTTP client of IntelliJ IDEA, checking the directory after each
+step; the resource server and OIDC client examples have such files too.
+
+What is specific to SCIM Events is the subject, a `scim` identifier with the relative `uri` of the
+resource and its `externalId`, and the event types under `urn:ietf:params:scim:event:`; the SET is
+verified like any other. `ScimProvisioningHandler` extends easyssf's `SsfScimEventHandler`, which
+hands every SCIM Event of a SET to the method of its operation (`onCreate`, `onPatch`, `onDelete`,
+…) as an `SsfScimEvent`: the resource as `data()` of a `full` event, the changed `attributes()` of
+a `notice` event, the ETag `version()`. `full` events are applied to the directory, `notice`
+events are logged, as the example has no SCIM service provider to fetch the resource from.
+
+### Tests
+
+`ScimProvisioningTest` plays the life of a user through the `TestTransmitter` itself, the demo
+service provider and its autoplay are not running in the tests; `ScimProvisioningIT` runs it against the native binary:
+
+```sh
+mvn -pl receiver/examples/example-scim-provisioning verify -Pnative
+```
 
 ## What triggers an event in Keycloak
 

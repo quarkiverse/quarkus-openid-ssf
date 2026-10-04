@@ -38,9 +38,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Native builds are slow (~5-10 min each). The resource server and the
-        # receiver-managed example run their integration tests against the
-        # native binary (easyssf's TestTransmitter stands in for the transmitter),
+        # Native builds are slow (~5-10 min each). The resource server, the
+        # receiver-managed and the SCIM provisioning example run their integration
+        # tests against the native binary (easyssf's TestTransmitter stands in for the transmitter),
         # which is where the JSON support shaded in Nimbus and the virtual threads
         # of easyssf get exercised under GraalVM.
         example:
@@ -48,6 +48,7 @@ jobs:
           - example-oidc-client
           - example-transmitter-managed-stream
           - example-receiver-managed-stream
+          - example-scim-provisioning
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
