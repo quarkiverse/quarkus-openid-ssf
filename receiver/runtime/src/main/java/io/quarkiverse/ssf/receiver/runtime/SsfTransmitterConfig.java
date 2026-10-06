@@ -155,8 +155,10 @@ public interface SsfTransmitterConfig {
         Optional<URI> endpointUrl();
 
         /**
-         * Whether the transmitter is polled periodically. Set to {@code false} to drive
-         * polling from application code with {@code SsfPollScheduler.pollNow()}.
+         * Whether the transmitter is polled by the extension, on a virtual thread of its
+         * own per transmitter: every {@code interval}, or with one request outstanding
+         * when {@code long-polling} is on. Set to {@code false} to drive polling from
+         * application code with {@code SsfPollScheduler.pollNow()}.
          */
         @WithDefault("true")
         boolean autoStart();
@@ -165,9 +167,34 @@ public interface SsfTransmitterConfig {
         @WithDefault("0s")
         Duration startDelay();
 
-        /** Time between two polls. */
+        /**
+         * Time between two polls. With {@code long-polling}, the pause after a failed
+         * request, or after a transmitter that does not hold requests answered an empty
+         * one at once. Also the pause before the next attempt when the poll endpoint of
+         * the stream was not known yet at the first one, as the stream is looked up in
+         * the background; set {@code endpoint-url} to poll right at startup.
+         */
         @WithDefault("30s")
         Duration interval();
+
+        /**
+         * Long polling (RFC 8936, section 2.5): the poller keeps one request outstanding
+         * that the transmitter holds until SETs are available or
+         * {@code long-polling-hold} elapses, instead of asking every {@code interval}
+         * whether there is something. A SET is then fetched as soon as the transmitter
+         * has it. The transmitter has to support long polling; one that answers at once
+         * is polled every {@code interval} as with {@code false}.
+         */
+        @WithDefault("false")
+        boolean longPolling();
+
+        /**
+         * How long the transmitter holds a long poll request, part of the agreement with
+         * it (RFC 8936, section 2.2). The request waits that long plus a margin for the
+         * response, {@code http.read-timeout} does not apply to it.
+         */
+        @WithDefault("30s")
+        Duration longPollingHold();
 
         /** Maximum number of SETs to fetch with one request ({@code maxEvents}, RFC 8936). */
         @WithDefault("100")

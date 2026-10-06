@@ -187,8 +187,9 @@ public final class SsfTransmitterFactory {
 
     /**
      * The poller of a transmitter with POLL delivery, configured from {@code poll.*}:
-     * interval, initial delay, batch size, rate limit handling and the acknowledgement
-     * store.
+     * interval, initial delay, batch size, rate limit handling, long polling, the
+     * acknowledgement store and a virtual thread named {@code ssf-poller-<name>} for
+     * {@link SsfPoller#start()}.
      *
      * @param ackStore where the acknowledgements wait for the next request, {@code null}
      *        for the in-memory store of the poller
@@ -213,6 +214,10 @@ public final class SsfTransmitterFactory {
         poller.setMaxEvents(poll.maxEvents());
         poller.setRateLimitFallback(poll.rateLimit().fallbackBackoff().orElse(null));
         poller.setMaxPause(poll.rateLimit().maxBackoff());
+        if (poll.longPolling()) {
+            poller.setLongPolling(poll.longPollingHold());
+        }
+        poller.setThreadFactory(Thread.ofVirtual().name("ssf-poller-" + name).factory());
         return poller;
     }
 
@@ -237,7 +242,8 @@ public final class SsfTransmitterFactory {
                 .receiverStream(receiverStream)
                 .streamVerification(streamVerification(receiverStream))
                 .streamRegistrar(streamRegistrar(name, config, streamClient, receiverStream))
-                // the SsfPollScheduler drives the poller with a Vert.x timer, start() is never called on it
+                // the SsfPollScheduler starts and stops the poller with the application, after the
+                // registrars, so that poll.auto-start is honoured in one place
                 .poller(poller(name, config, httpClient, tokenProvider, processor, receiverStream, metrics, ackStore),
                         false)
                 .pushAuthorizationHeader(config.push().expectedAuthHeader().orElse(null));
