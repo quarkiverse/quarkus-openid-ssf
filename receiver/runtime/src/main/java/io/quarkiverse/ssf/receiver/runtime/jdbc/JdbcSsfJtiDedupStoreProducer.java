@@ -1,5 +1,6 @@
 package io.quarkiverse.ssf.receiver.runtime.jdbc;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.sql.DataSource;
@@ -8,7 +9,7 @@ import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
-import org.easyssf.receiver.jdbc.DataSourceSsfJdbcOperations;
+import org.easyssf.receiver.jdbc.JdbcSsfExpiringStore;
 import org.easyssf.receiver.jdbc.JdbcSsfJtiDedupStore;
 import org.easyssf.receiver.jdbc.JdbcSsfSchema;
 import org.easyssf.receiver.jdbc.JdbcSsfStoreCleanup;
@@ -27,15 +28,16 @@ import io.quarkus.arc.InjectableInstance;
  * share them and they survive a restart. Falls back to the in-memory store when
  * {@code jdbc.enabled=false} or no default datasource is configured. Registered by the
  * deployment processor instead of the in-memory producer when Agroal is present.
+ *
+ * <p>
+ * With {@code jdbc.initialize-schema=true} the table is created if it is missing and
+ * gets the columns a release added ({@code STATE} in easyssf 0.3.0); with {@code false}
+ * the start fails naming the statements to run.
  */
 @Singleton
 public class JdbcSsfJtiDedupStoreProducer {
 
     private static final Logger LOG = Logger.getLogger(JdbcSsfJtiDedupStoreProducer.class);
-
-    private static final String SCHEMA_HINT = "set quarkus.openid-ssf.receiver.jdbc.initialize-schema=true to have "
-            + "it created on startup, or quarkus.openid-ssf.receiver.jdbc.enabled=false to keep the state of the "
-            + "receiver in memory";
 
     @Inject
     SsfReceiverConfig config;
@@ -48,19 +50,18 @@ public class JdbcSsfJtiDedupStoreProducer {
     @DefaultBean
     public SsfJtiDedupStore dedupStore() {
         SsfReceiverConfig.Jdbc jdbc = config.jdbc();
-        if (!jdbc.enabled()) {
-            return inMemory("quarkus.openid-ssf.receiver.jdbc.enabled=false");
-        }
-        if (!dataSource.isResolvable() || !dataSource.getHandle().getBean().isActive()) {
-            return inMemory("no default datasource is configured");
+        String inMemoryReason = JdbcSsfStores.inMemoryReason(jdbc, dataSource);
+        if (inMemoryReason != null) {
+            return inMemory(inMemoryReason);
         }
         String tablePrefix = jdbc.tablePrefix();
         String table = JdbcSsfSchema.processedSetTable(tablePrefix);
-        SsfJdbcOperations operations = new DataSourceSsfJdbcOperations(dataSource.get());
+        SsfJdbcOperations operations = JdbcSsfStores.operations(dataSource);
         JdbcSsfSchema.prepareTable(operations, table, JdbcSsfSchema.createProcessedSetTable(tablePrefix),
-                jdbc.initializeSchema(), SCHEMA_HINT);
+                JdbcSsfSchema.processedSetUpgrades(tablePrefix), jdbc.initializeSchema(), JdbcSsfStores.SCHEMA_HINT);
         JdbcSsfJtiDedupStore store = new JdbcSsfJtiDedupStore(operations, tablePrefix);
         store.setRetention(config.dedup().retention());
+        store.setLease(config.dedup().lease());
         LOG.infof("Processed SETs are remembered in the table %s", table);
         return store;
     }
@@ -73,14 +74,17 @@ public class JdbcSsfJtiDedupStoreProducer {
     @Singleton
     @DefaultBean
     public JdbcSsfStoreCleanup storeCleanup(SsfJtiDedupStore dedupStore) {
-        List<org.easyssf.receiver.jdbc.JdbcSsfExpiringStore> stores = (dedupStore instanceof JdbcSsfJtiDedupStore jdbcStore)
-                ? List.of(jdbcStore)
-                : List.of();
+        List<JdbcSsfExpiringStore> stores = new ArrayList<>();
+        if (dedupStore instanceof JdbcSsfExpiringStore expiring) {
+            stores.add(expiring);
+        }
         return new JdbcSsfStoreCleanup(stores, config.jdbc().cleanupInterval());
     }
 
     private SsfJtiDedupStore inMemory(String reason) {
         LOG.debugf("Processed SETs are remembered in memory, %s", reason);
-        return new InMemorySsfJtiDedupStore(config.dedup().capacity());
+        InMemorySsfJtiDedupStore store = new InMemorySsfJtiDedupStore(config.dedup().capacity());
+        store.setLease(config.dedup().lease());
+        return store;
     }
 }

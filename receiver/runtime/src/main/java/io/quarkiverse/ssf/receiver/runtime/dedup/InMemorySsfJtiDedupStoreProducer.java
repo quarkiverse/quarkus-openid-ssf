@@ -12,7 +12,8 @@ import io.quarkus.arc.DefaultBean;
 
 /**
  * The {@link SsfJtiDedupStore} without a datasource: the in-memory store of easyssf with
- * {@code dedup.capacity} entries. An application bean of the type replaces it.
+ * {@code dedup.capacity} entries and the {@code dedup.lease}. An application bean of the
+ * type replaces it.
  */
 @Singleton
 public class InMemorySsfJtiDedupStoreProducer {
@@ -24,6 +25,8 @@ public class InMemorySsfJtiDedupStoreProducer {
     @Singleton
     @DefaultBean
     public SsfJtiDedupStore dedupStore() {
-        return new InMemorySsfJtiDedupStore(config.dedup().capacity());
+        InMemorySsfJtiDedupStore store = new InMemorySsfJtiDedupStore(config.dedup().capacity());
+        store.setLease(config.dedup().lease());
+        return store;
     }
 }

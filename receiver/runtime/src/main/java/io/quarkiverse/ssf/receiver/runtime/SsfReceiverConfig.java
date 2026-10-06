@@ -165,6 +165,17 @@ public interface SsfReceiverConfig {
          */
         @WithDefault("7d")
         Duration retention();
+
+        /**
+         * How long a SET stays claimed while its handlers run. A SET is claimed in the
+         * store before the handlers run and marked processed afterwards; another
+         * instance that receives the same SET meanwhile neither handles nor acknowledges
+         * it, the transmitter delivers it again. A claim older than the lease counts as
+         * abandoned by an instance that crashed, and the SET is handled again. Set it
+         * longer than the longest handler.
+         */
+        @WithDefault("60s")
+        Duration lease();
     }
 
     interface Jdbc {
@@ -178,10 +189,14 @@ public interface SsfReceiverConfig {
         boolean enabled();
 
         /**
-         * Whether the table is created at startup if it does not exist. With {@code false}
-         * the table has to be created with the statements in
-         * {@code classpath:org/easyssf/receiver/jdbc/schema.sql}, for example by a schema
-         * migration, and the start fails if it is missing.
+         * Whether the tables are created at startup if they do not exist, and columns a
+         * release added are added to an existing table. With {@code false} the tables
+         * have to be created with the statements in
+         * {@code classpath:org/easyssf/receiver/jdbc/schema.sql} (a fresh installation)
+         * or the versioned scripts in
+         * {@code classpath:org/easyssf/receiver/jdbc/migration/} (Flyway naming, plain
+         * SQL), for example by a schema migration, and the start fails naming the
+         * statements to run if a table or a column is missing.
          */
         @WithDefault("true")
         boolean initializeSchema();

@@ -1,17 +1,12 @@
 package io.quarkiverse.ssf.receiver.deployment;
 
 import static io.restassured.RestAssured.given;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.instanceOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.sql.DataSource;
@@ -19,13 +14,9 @@ import javax.sql.DataSource;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
-import org.easyssf.core.event.SsfEventToken;
 import org.easyssf.core.event.SsfSubjectIdentifiers;
 import org.easyssf.receiver.event.SsfEventContext;
 import org.easyssf.receiver.event.SsfEventHandler;
-import org.easyssf.receiver.jdbc.JdbcSsfJtiDedupStore;
-import org.easyssf.receiver.jdbc.JdbcSsfStoreCleanup;
-import org.easyssf.receiver.set.SsfJtiDedupStore;
 import org.easyssf.test.TestTransmitter;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -38,12 +29,15 @@ import io.restassured.config.EncoderConfig;
 import io.restassured.http.ContentType;
 
 /**
- * With {@code quarkus-agroal} and a datasource, processed SETs are remembered in the
- * database: the table is created on startup, a SET posted twice reaches the handler once,
- * and its row is in the table. A claimed SET is left to the instance that claimed it
- * until {@code dedup.lease} passed.
+ * A {@code PROCESSED_SET} table of easyssf 0.1.0 (no {@code STATE} column, created here
+ * by the {@code INIT} script of the H2 URL) is upgraded on startup with
+ * {@code jdbc.initialize-schema=true}, and the receiver de-duplicates through it.
  */
-public class JdbcDedupStoreTest {
+public class JdbcSchemaUpgradeTest {
+
+    static final String OLD_TABLE = "CREATE TABLE IF NOT EXISTS TEST_PROCESSED_SET ("
+            + "ISSUER VARCHAR(255) NOT NULL, JTI VARCHAR(255) NOT NULL, PROCESSED_AT BIGINT NOT NULL, "
+            + "CONSTRAINT TEST_PROCESSED_SET_PK PRIMARY KEY (ISSUER, JTI))";
 
     @RegisterExtension
     static final QuarkusUnitTest TEST = new QuarkusUnitTest()
@@ -54,10 +48,10 @@ public class JdbcDedupStoreTest {
             })
             .setAfterAllCustomizer(TestTransmitters::stop)
             .overrideConfigKey("quarkus.datasource.db-kind", "h2")
-            .overrideConfigKey("quarkus.datasource.jdbc.url", "jdbc:h2:mem:ssf;DB_CLOSE_DELAY=-1")
+            .overrideConfigKey("quarkus.datasource.jdbc.url",
+                    "jdbc:h2:mem:ssf-upgrade;DB_CLOSE_DELAY=-1;INIT=" + OLD_TABLE)
             .overrideConfigKey("quarkus.openid-ssf.receiver.jdbc.table-prefix", "TEST_")
-            .overrideConfigKey("quarkus.openid-ssf.receiver.jdbc.cleanup-interval", "1s")
-            .overrideConfigKey("quarkus.openid-ssf.receiver.dedup.lease", "1s")
+            .overrideConfigKey("quarkus.openid-ssf.receiver.jdbc.initialize-schema", "true")
             .overrideConfigKey("quarkus.openid-ssf.receiver.transmitter-issuer",
                     TestTransmitters.ref(TestTransmitters.issuerProperty(TestTransmitters.DEFAULT)))
             .overrideConfigKey("quarkus.openid-ssf.receiver.expected-audience", TestTransmitter.AUDIENCE)
@@ -70,12 +64,6 @@ public class JdbcDedupStoreTest {
     SsfEventHandler handler;
 
     @Inject
-    SsfJtiDedupStore dedupStore;
-
-    @Inject
-    JdbcSsfStoreCleanup cleanup;
-
-    @Inject
     DataSource dataSource;
 
     @BeforeAll
@@ -85,16 +73,17 @@ public class JdbcDedupStoreTest {
     }
 
     @Test
-    @DisplayName("Processed SETs are remembered in the table, a duplicate reaches the handler once")
-    void duplicateSkippedThroughTheDatabase() throws Exception {
-        assertThat(dedupStore, instanceOf(JdbcSsfJtiDedupStore.class));
-        assertTrue(cleanup.isRunning(), "the periodic cleanup runs");
+    @DisplayName("The STATE column was added to the old table, and a duplicate reaches the handler once")
+    void tableUpgraded() throws Exception {
+        try (Connection connection = dataSource.getConnection();
+                Statement statement = connection.createStatement();
+                ResultSet rows = statement.executeQuery("SELECT STATE, PROCESSED_AT FROM TEST_PROCESSED_SET")) {
+            assertEquals(2, rows.getMetaData().getColumnCount());
+        }
 
         String set = TestTransmitters.current().set("CaepSessionRevoked", SsfSubjectIdentifiers.opaque("user-1234"));
-        String jti = com.nimbusds.jwt.SignedJWT.parse(set).getJWTClaimsSet().getJWTID();
         CountingHandler counting = (CountingHandler) handler;
         counting.invocations.set(0);
-
         for (int i = 0; i < 2; i++) {
             given().header("Content-Type", "application/secevent+jwt").body(set)
                     .when().post("/ssf/push")
@@ -104,30 +93,10 @@ public class JdbcDedupStoreTest {
 
         try (Connection connection = dataSource.getConnection();
                 Statement statement = connection.createStatement();
-                ResultSet rows = statement.executeQuery(
-                        "SELECT COUNT(*) FROM TEST_PROCESSED_SET WHERE JTI = '" + jti + "'")) {
+                ResultSet rows = statement.executeQuery("SELECT STATE FROM TEST_PROCESSED_SET")) {
             assertTrue(rows.next());
-            assertEquals(1, rows.getInt(1), "the SET is in the table");
+            assertEquals("PROCESSED", rows.getString(1));
         }
-    }
-
-    @Test
-    @DisplayName("dedup.lease reaches the store: a claim is taken over once the lease passed")
-    void leaseIsConfigured() throws Exception {
-        SsfEventToken token = new SsfEventToken("lease-" + System.nanoTime(), TestTransmitters.current().issuer(),
-                Instant.now(), List.of(TestTransmitter.AUDIENCE), Map.of(TestTransmitters.EVENT_TYPE, Map.of()),
-                null, null, Map.of());
-
-        SsfJtiDedupStore.Claim first = dedupStore.claim(token);
-        assertEquals(SsfJtiDedupStore.State.NEW, first.state());
-        assertEquals(SsfJtiDedupStore.State.IN_PROGRESS, dedupStore.claim(token).state(), "claimed by this instance");
-
-        Thread.sleep(1200);
-        SsfJtiDedupStore.Claim takenOver = dedupStore.claim(token);
-        assertEquals(SsfJtiDedupStore.State.NEW, takenOver.state(), "the lease of 1s passed, the claim is abandoned");
-
-        dedupStore.processed(token, takenOver);
-        assertEquals(SsfJtiDedupStore.State.PROCESSED, dedupStore.claim(token).state());
     }
 
     @Singleton
