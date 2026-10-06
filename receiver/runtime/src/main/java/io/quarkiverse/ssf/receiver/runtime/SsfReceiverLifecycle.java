@@ -18,7 +18,8 @@ import io.quarkus.runtime.StartupEvent;
 /**
  * Starts the background work of the receiver once the application is up and stops it on
  * shutdown: looking up or registering the streams of the transmitters, and deleting them
- * on shutdown when asked to. Polling is driven by the {@code SsfPollScheduler}.
+ * on shutdown when asked to. The pollers are started and stopped by the
+ * {@code SsfPollScheduler}, which stops them ahead of this bean.
  *
  * <p>
  * Building the transmitters here, at startup, makes a configuration error fail the

@@ -3,6 +3,7 @@ package io.quarkiverse.ssf.receiver.runtime.delivery.poll;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.ReentrantLock;
 
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -19,14 +20,20 @@ import io.quarkiverse.ssf.receiver.runtime.SsfReceiverConfig;
 import io.quarkiverse.ssf.receiver.runtime.SsfTransmitterConfig;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
-import io.vertx.core.Vertx;
 
 /**
- * Drives the pollers of the transmitters with POLL delivery (RFC 8936): a Vert.x
- * periodic timer per transmitter runs {@link SsfPoller#pollNow()} on a virtual thread
- * every {@code poll.interval}, after {@code poll.start-delay}. A tick is skipped while a
- * poll is still running. With {@code poll.auto-start=false} no timer is scheduled and
- * the application polls by calling {@link #pollNow()}.
+ * Starts and stops the pollers of the transmitters with POLL delivery (RFC 8936) with
+ * the application. Each poller runs on a virtual thread of its own, named
+ * {@code ssf-poller-<transmitter>}: it polls every {@code poll.interval} after
+ * {@code poll.start-delay}, or keeps one request outstanding with
+ * {@code poll.long-polling}, and sends the pending acknowledgements with a last request
+ * when the application stops. With {@code poll.auto-start=false} the poller is not
+ * started and the application polls by calling {@link #pollNow()}.
+ *
+ * <p>
+ * The pollers are stopped before the stream registrars (which may delete the stream on
+ * shutdown) and before the datasource closes, so that the last request can carry the
+ * acknowledgements and remove them from a JDBC store.
  */
 @ApplicationScoped
 public class SsfPollScheduler {
@@ -37,12 +44,12 @@ public class SsfPollScheduler {
     SsfReceiverConfig config;
 
     @Inject
-    Vertx vertx;
-
-    @Inject
     Instance<SsfTransmitters> transmitters;
 
-    private final List<Long> timers = new ArrayList<>();
+    private final List<SsfPoller> started = new ArrayList<>();
+
+    /** a lock rather than synchronized, which pins virtual threads before JDK 24 */
+    private final ReentrantLock lifecycle = new ReentrantLock();
 
     void onStart(@Observes @Priority(300) StartupEvent event) {
         if (!config.enabled()) {
@@ -60,27 +67,43 @@ public class SsfPollScheduler {
                 LOG.infof("SSF transmitter %s: poll.auto-start=false, polling is driven by the application", transmitter);
                 continue;
             }
-            long initialDelay = Math.max(1L, poll.startDelay().toMillis());
-            long interval = Math.max(1L, poll.interval().toMillis());
-            LOG.infof("SSF transmitter %s: polling every %s (start delay %s, max %d SETs per request)", transmitter,
-                    poll.interval(), poll.startDelay(), poll.maxEvents());
-            synchronized (timers) {
-                timers.add(vertx.setPeriodic(initialDelay, interval, id -> poll(transmitter)));
+            if (poller.isLongPolling()) {
+                LOG.infof("SSF transmitter %s: long polling, a request is held for up to %s (start delay %s, max %d "
+                        + "SETs per request)", transmitter, poll.longPollingHold(), poll.startDelay(), poll.maxEvents());
+            } else {
+                LOG.infof("SSF transmitter %s: polling every %s (start delay %s, max %d SETs per request)",
+                        transmitter, poll.interval(), poll.startDelay(), poll.maxEvents());
+            }
+            lifecycle.lock();
+            try {
+                poller.start();
+                started.add(poller);
+            } finally {
+                lifecycle.unlock();
             }
         }
     }
 
-    void onStop(@Observes ShutdownEvent event) {
-        synchronized (timers) {
-            timers.forEach(vertx::cancelTimer);
-            timers.clear();
+    /**
+     * Stops the pollers ahead of the other shutdown observers ({@code SsfReceiverLifecycle}
+     * stops the registrars at the default priority), as the last request has to reach
+     * the stream before it is deleted.
+     */
+    void onStop(@Observes @Priority(100) ShutdownEvent event) {
+        lifecycle.lock();
+        try {
+            started.forEach(SsfPoller::stop);
+            started.clear();
+        } finally {
+            lifecycle.unlock();
         }
     }
 
     /**
-     * Polls the default transmitter once, synchronously, and returns the number of SETs
-     * fetched. {@code 0} as well if the poll endpoint is not known yet, the transmitter
-     * asked to slow down or a poll is in progress.
+     * Polls the default transmitter once, synchronously, with a request answered
+     * immediately, and returns the number of SETs fetched. {@code 0} as well if the poll
+     * endpoint is not known yet, the transmitter asked to slow down or a poll is in
+     * progress (with long polling, the started poller holds one most of the time).
      *
      * @throws IllegalStateException if the receiver is disabled, has no default
      *         transmitter or the transmitter does not deliver by POLL
@@ -117,16 +140,5 @@ public class SsfPollScheduler {
                     "The SSF receiver is disabled (quarkus.openid-ssf.receiver.enabled=false), nothing to poll");
         }
         return transmitters.get();
-    }
-
-    private void poll(SsfTransmitter transmitter) {
-        Thread.ofVirtual().name("ssf-poll-" + transmitter.getName()).start(() -> {
-            try {
-                transmitter.getPoller().pollNow();
-            } catch (RuntimeException e) {
-                LOG.warnf("Could not poll the SSF transmitter %s: %s", transmitter, e.getMessage());
-                LOG.debugf(e, "Cause of the failed poll");
-            }
-        });
     }
 }

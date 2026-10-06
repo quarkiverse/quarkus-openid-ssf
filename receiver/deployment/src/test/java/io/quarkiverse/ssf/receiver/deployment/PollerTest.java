@@ -98,6 +98,14 @@ public class PollerTest {
     }
 
     @Test
+    @DisplayName("poll.auto-start=false -> the poller thread is not started")
+    void notStarted() {
+        SsfPoller poller = transmitters.primary().orElseThrow().getPoller();
+        assertThat(poller.isRunning(), is(false));
+        assertThat(poller.isLongPolling(), is(false));
+    }
+
+    @Test
     @DisplayName("Nothing queued -> handler not invoked, nothing acknowledged")
     void emptyResponse() {
         assertEquals(0, scheduler.pollNow());
