@@ -25,6 +25,9 @@ import io.quarkiverse.ssf.receiver.runtime.SsfReceiverConfig;
  * {@code delivery} and {@code event} (the alias of the event type)</li>
  * <li>{@code easyssf.receiver.poll}: poll requests, tagged with {@code transmitter} and
  * {@code outcome}</li>
+ * <li>{@code easyssf.receiver.poll.pending-acks}: the acknowledgements and error reports
+ * a started poller owes its transmitter, tagged with {@code transmitter}; registered by
+ * easyssf when the poller starts</li>
  * <li>{@code easyssf.receiver.dedup.size}: the number of SET identifiers the in-memory
  * de-duplication store remembers</li>
  * </ul>

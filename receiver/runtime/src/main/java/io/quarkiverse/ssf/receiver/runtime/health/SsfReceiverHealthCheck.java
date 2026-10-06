@@ -32,6 +32,12 @@ import io.smallrye.health.api.Wellness;
  * contact was made yet.</li>
  * <li>DOWN: a last poll failed, or a stream cannot be used.</li>
  * </ul>
+ *
+ * <p>
+ * With POLL delivery the details carry the last poll, its error, a pause the
+ * transmitter asked for, how the transmitter is polled ({@code periodic}, {@code long},
+ * or {@code manual} with {@code poll.auto-start=false}) and the number of
+ * acknowledgements waiting for the next request ({@code pendingAcks}).
  */
 @Wellness
 @Singleton
@@ -90,6 +96,14 @@ public class SsfReceiverHealthCheck implements HealthCheck {
             Instant pausedUntil = poller.getPausedUntil();
             if (pausedUntil != null && pausedUntil.isAfter(Instant.now())) {
                 response.withData(prefix + "pausedUntil", pausedUntil.toString());
+            }
+            response.withData(prefix + "polling", poller.isRunning() ? (poller.isLongPolling() ? "long" : "periodic")
+                    : "manual");
+            try {
+                response.withData(prefix + "pendingAcks", poller.getPendingAckCount());
+            } catch (RuntimeException e) {
+                // a JDBC store that cannot be read: the poll itself will report it
+                response.withData(prefix + "pendingAcksError", String.valueOf(e.getMessage()));
             }
             up &= error == null;
         }

@@ -82,6 +82,7 @@ export class QwcSsfStreamManagement extends LitElement {
         _subjResult:    { state: true },
         _registration:  { state: true },
         _aliases:       { state: true },
+        _polling:       { state: true },
         _error:         { state: true },
         _busy:          { state: true },
     };
@@ -100,6 +101,7 @@ export class QwcSsfStreamManagement extends LitElement {
         this._subjResult = null;
         this._registration = null;
         this._aliases = null;
+        this._polling = null;
         this._error = null;
         this._busy = false;
     }
@@ -107,6 +109,13 @@ export class QwcSsfStreamManagement extends LitElement {
     connectedCallback() {
         super.connectedCallback();
         this._checkRegistrationThenLoad();
+        this._loadPolling();
+    }
+
+    _loadPolling() {
+        this.jsonRpc.pollStatus().then(r => {
+            this._polling = r.result;
+        }).catch(e => this._setError(e));
     }
 
     _checkRegistrationThenLoad() {
@@ -162,6 +171,7 @@ export class QwcSsfStreamManagement extends LitElement {
     _refreshAll() {
         this._loadConfiguration();
         this._loadStatus();
+        this._loadPolling();
     }
 
     _verifyStream() {
@@ -441,6 +451,51 @@ export class QwcSsfStreamManagement extends LitElement {
     }
 
 
+    /** The pollers of the transmitters with POLL delivery, nothing when every transmitter delivers by PUSH. */
+    _renderPolling() {
+        if (!this._polling || this._polling.length === 0) return html``;
+        return html`
+            <h3 style="margin-top:1.25rem">Polling</h3>
+            ${this._polling.map(p => html`
+                <div class="row">
+                    <div class="field">
+                        <div class="field-label">Transmitter</div>
+                        <div class="value"><strong>${p.transmitterName}</strong>
+                            <div style="font-size:var(--lumo-font-size-xs);color:var(--lumo-secondary-text-color);word-break:break-all">${p.transmitterIssuer}</div>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Mode</div>
+                        <div class="value">${!p.autoStart ? 'manual (poll.auto-start=false)'
+                            : p.longPolling ? `long polling, held up to ${p.longPollingHold}`
+                            : `every ${p.interval}`}${p.running ? '' : ' (not running)'}, max ${p.maxEvents} SETs per request</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Pending acknowledgements</div>
+                        <div class="value">${p.pendingAcks ?? (p.pendingAcksError ? `unknown: ${p.pendingAcksError}` : '—')}</div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="field">
+                        <div class="field-label">Last poll</div>
+                        <div class="value">${p.lastPoll ?? 'never'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Last successful poll</div>
+                        <div class="value">${p.lastSuccessfulPoll ?? 'never'}</div>
+                    </div>
+                    ${p.pausedUntil ? html`
+                        <div class="field">
+                            <div class="field-label">Paused until</div>
+                            <div class="value">${p.pausedUntil}</div>
+                        </div>
+                    ` : ''}
+                </div>
+                ${p.pollError ? html`<div class="error">${p.pollError}</div>` : ''}
+            `)}
+        `;
+    }
+
     _renderRegistrationPending() {
         const r = this._registration;
         return html`
@@ -484,6 +539,8 @@ export class QwcSsfStreamManagement extends LitElement {
 
             <h3 style="margin-top:1.25rem">Status</h3>
             ${this._renderStatus()}
+
+            ${this._renderPolling()}
 
             <h3 style="margin-top:1.25rem">Toggle</h3>
             <vaadin-text-field
