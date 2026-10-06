@@ -16,6 +16,7 @@ import org.easyssf.receiver.event.SsfEventHandler;
 import org.easyssf.receiver.http.JdkSsfHttpClient;
 import org.easyssf.receiver.http.SsfHttpClient;
 import org.easyssf.receiver.metrics.SsfReceiverMetrics;
+import org.easyssf.receiver.poll.SsfPollAckStore;
 import org.easyssf.receiver.push.SsfPushHandler;
 import org.easyssf.receiver.set.SsfJtiDedupStore;
 import org.easyssf.receiver.set.SsfSetProcessor;
@@ -45,7 +46,8 @@ import io.quarkus.runtime.configuration.ConfigurationException;
  * with its {@code push.expected-auth-header}.</li>
  * <li>{@link SsfTransmitters}: one {@link SsfTransmitter} per configured transmitter,
  * built by {@link SsfTransmitterFactory} and customized by the
- * {@link SsfTransmitterCustomizer} beans.</li>
+ * {@link SsfTransmitterCustomizer} beans. The pollers share the {@link SsfPollAckStore}
+ * bean (in memory, or JDBC with {@code quarkus-agroal}).</li>
  * </ul>
  */
 @Singleton
@@ -113,7 +115,7 @@ public class SsfReceiverProducers {
     @DefaultBean
     public SsfTransmitters transmitters(SsfHttpClient httpClient, SsfSetProcessor processor,
             SsfReceiverMetrics metrics, Instance<OidcTransmitterTokenProviders> oidcProviders,
-            Instance<SsfTransmitterCustomizer> customizers) {
+            Instance<SsfTransmitterCustomizer> customizers, Instance<SsfPollAckStore> ackStore) {
         Map<String, SsfTransmitterConfig> configured = config.configuredTransmitters();
         if (configured.isEmpty()) {
             throw new ConfigurationException("quarkus.openid-ssf.receiver.transmitter-issuer: the issuer of the SSF "
@@ -123,9 +125,10 @@ public class SsfReceiverProducers {
         OidcTransmitterTokenProviders oidc = oidcProviders.isResolvable() ? oidcProviders.get() : null;
         List<SsfTransmitterCustomizer> customizerList = customizers.stream().toList();
         List<SsfTransmitter> transmitters = new ArrayList<>();
+        SsfPollAckStore acks = ackStore.isResolvable() ? ackStore.get() : null;
         configured.forEach((name, transmitterConfig) -> {
             SsfTransmitter.Builder builder = SsfTransmitterFactory.builder(name, transmitterConfig, httpClient,
-                    processor, metrics, oidc);
+                    processor, metrics, oidc, acks);
             customizerList.forEach(customizer -> customizer.customize(builder));
             transmitters.add(builder.build());
         });

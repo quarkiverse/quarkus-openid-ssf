@@ -5,6 +5,7 @@ import org.jboss.logging.Logger;
 import io.quarkiverse.ssf.receiver.runtime.SsfReceiverLifecycle;
 import io.quarkiverse.ssf.receiver.runtime.SsfReceiverProducers;
 import io.quarkiverse.ssf.receiver.runtime.dedup.InMemorySsfJtiDedupStoreProducer;
+import io.quarkiverse.ssf.receiver.runtime.delivery.poll.InMemorySsfPollAckStoreProducer;
 import io.quarkiverse.ssf.receiver.runtime.delivery.poll.SsfPollScheduler;
 import io.quarkiverse.ssf.receiver.runtime.delivery.push.SsfPushRoute;
 import io.quarkiverse.ssf.receiver.runtime.event.LoggingSsfEventHandler;
@@ -26,7 +27,8 @@ class SsfReceiverProcessor {
     /** The optional integrations; named by string so that their classes are only loaded when wanted. */
     private static final String OIDC_TOKEN_PROVIDERS_CLASS = "io.quarkiverse.ssf.receiver.runtime.auth.OidcClientTransmitterTokenProviders";
     private static final String MICROMETER_METRICS_CLASS = "io.quarkiverse.ssf.receiver.runtime.metrics.MicrometerSsfReceiverMetricsProducer";
-    private static final String JDBC_STORE_PRODUCER_CLASS = "io.quarkiverse.ssf.receiver.runtime.jdbc.JdbcSsfJtiDedupStoreProducer";
+    private static final String JDBC_DEDUP_STORE_PRODUCER_CLASS = "io.quarkiverse.ssf.receiver.runtime.jdbc.JdbcSsfJtiDedupStoreProducer";
+    private static final String JDBC_ACK_STORE_PRODUCER_CLASS = "io.quarkiverse.ssf.receiver.runtime.jdbc.JdbcSsfPollAckStoreProducer";
     private static final String HEALTH_CHECK_CLASS = "io.quarkiverse.ssf.receiver.runtime.health.SsfReceiverHealthCheck";
 
     @BuildStep
@@ -78,16 +80,19 @@ class SsfReceiverProcessor {
     }
 
     /**
-     * Processed SETs are remembered in the default datasource when {@code quarkus-agroal}
-     * is present, in memory otherwise.
+     * The stores of the receiver: processed SETs and pending poll acknowledgements are
+     * kept in the default datasource when {@code quarkus-agroal} is present, in memory
+     * otherwise.
      */
     @BuildStep
-    AdditionalBeanBuildItem registerDedupStore(Capabilities capabilities) {
+    AdditionalBeanBuildItem registerStores(Capabilities capabilities) {
         if (capabilities.isPresent(Capability.AGROAL)) {
-            LOG.debug("quarkus-agroal detected, processed SETs can be remembered in the default datasource");
-            return AdditionalBeanBuildItem.builder().setUnremovable().addBeanClass(JDBC_STORE_PRODUCER_CLASS).build();
+            LOG.debug("quarkus-agroal detected, the state of the SSF receiver can be kept in the default datasource");
+            return AdditionalBeanBuildItem.builder().setUnremovable()
+                    .addBeanClasses(JDBC_DEDUP_STORE_PRODUCER_CLASS, JDBC_ACK_STORE_PRODUCER_CLASS).build();
         }
-        return AdditionalBeanBuildItem.builder().setUnremovable().addBeanClass(InMemorySsfJtiDedupStoreProducer.class)
+        return AdditionalBeanBuildItem.builder().setUnremovable()
+                .addBeanClasses(InMemorySsfJtiDedupStoreProducer.class, InMemorySsfPollAckStoreProducer.class)
                 .build();
     }
 

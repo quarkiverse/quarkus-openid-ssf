@@ -9,6 +9,7 @@ import org.easyssf.core.SsfDeliveryMethod;
 import org.easyssf.core.stream.SsfStreamConfiguration;
 import org.easyssf.receiver.http.SsfHttpClient;
 import org.easyssf.receiver.metrics.SsfReceiverMetrics;
+import org.easyssf.receiver.poll.SsfPollAckStore;
 import org.easyssf.receiver.poll.SsfPoller;
 import org.easyssf.receiver.set.NimbusSsfSetVerifier;
 import org.easyssf.receiver.set.SsfSetProcessor;
@@ -184,10 +185,18 @@ public final class SsfTransmitterFactory {
         return registrar;
     }
 
-    /** @return the poller, {@code null} with PUSH delivery */
+    /**
+     * The poller of a transmitter with POLL delivery, configured from {@code poll.*}:
+     * interval, initial delay, batch size, rate limit handling and the acknowledgement
+     * store.
+     *
+     * @param ackStore where the acknowledgements wait for the next request, {@code null}
+     *        for the in-memory store of the poller
+     * @return the poller, {@code null} with PUSH delivery
+     */
     public static SsfPoller poller(String name, SsfTransmitterConfig config, SsfHttpClient httpClient,
             SsfTransmitterTokenProvider tokenProvider, SsfSetProcessor processor, SsfReceiverStream receiverStream,
-            SsfReceiverMetrics metrics) {
+            SsfReceiverMetrics metrics, SsfPollAckStore ackStore) {
         if (config.deliveryMethod() != SsfTransmitterConfig.DeliveryMethod.POLL) {
             return null;
         }
@@ -196,6 +205,9 @@ public final class SsfTransmitterFactory {
                 processor);
         poller.setTransmitter(issuer(name, config));
         poller.setMetrics((metrics != null) ? metrics : SsfReceiverMetrics.NOOP);
+        if (ackStore != null) {
+            poller.setAckStore(ackStore);
+        }
         poller.setInterval(poll.interval());
         poller.setInitialDelay(poll.startDelay());
         poller.setMaxEvents(poll.maxEvents());
@@ -206,9 +218,13 @@ public final class SsfTransmitterFactory {
 
     /**
      * A builder with every part of the transmitter built from its configuration.
+     *
+     * @param ackStore where the acknowledgements of the poller wait, {@code null} for the
+     *        in-memory store of the poller
      */
     public static SsfTransmitter.Builder builder(String name, SsfTransmitterConfig config, SsfHttpClient httpClient,
-            SsfSetProcessor processor, SsfReceiverMetrics metrics, OidcTransmitterTokenProviders oidcProviders) {
+            SsfSetProcessor processor, SsfReceiverMetrics metrics, OidcTransmitterTokenProviders oidcProviders,
+            SsfPollAckStore ackStore) {
         SsfReceiverStream receiverStream = new SsfReceiverStream();
         SsfTransmitterMetadataResolver metadataResolver = metadataResolver(name, config, httpClient);
         SsfTransmitterTokenProvider tokenProvider = tokenProvider(name, config, httpClient, oidcProviders);
@@ -222,7 +238,8 @@ public final class SsfTransmitterFactory {
                 .streamVerification(streamVerification(receiverStream))
                 .streamRegistrar(streamRegistrar(name, config, streamClient, receiverStream))
                 // the SsfPollScheduler drives the poller with a Vert.x timer, start() is never called on it
-                .poller(poller(name, config, httpClient, tokenProvider, processor, receiverStream, metrics), false)
+                .poller(poller(name, config, httpClient, tokenProvider, processor, receiverStream, metrics, ackStore),
+                        false)
                 .pushAuthorizationHeader(config.push().expectedAuthHeader().orElse(null));
     }
 
