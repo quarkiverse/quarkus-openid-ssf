@@ -31,8 +31,10 @@ native image support.
 
 - Accepts inbound SETs via **PUSH** (RFC 8935): a Vert.x route at `/ssf/push`,
   answering with the RFC 8935 error documents.
-- Pulls SETs via **POLL** (RFC 8936): a periodic Vert.x timer per transmitter,
-  acknowledgements, error reports, `Retry-After` handling, a manual `pollNow()`.
+- Pulls SETs via **POLL** (RFC 8936): a poller per transmitter on a virtual
+  thread, periodic or long polling, acknowledgements that wait in a store
+  (optionally the database) until a request carried them, error reports,
+  `Retry-After` handling, a manual `pollNow()`.
 - Verifies every SET: JWS signature against the transmitter's JWK Set, `typ`
   header, `iss` / `iat` / `jti` / `aud` / `events` per RFC 8417. RS256-only with
   a 2048-bit minimum RSA key by default (CAEP Interop Profile), both tunable.
@@ -44,8 +46,9 @@ native image support.
   by the issuer of a SET.
 - Exposes the stream management API (SSF section 8.1): configuration, status,
   subjects, verification.
-- Optional: Micrometer metrics, a SmallRye Health wellness check, a JDBC
-  de-duplication store over the default Agroal datasource, a Dev UI.
+- Optional: Micrometer metrics, a SmallRye Health wellness check, JDBC stores
+  (processed SETs, pending poll acknowledgements) over the default Agroal
+  datasource so that several instances share them, a Dev UI.
 - Outbound auth: static bearer token, OAuth2 `client_credentials` (no extra
   dependency), `quarkus-oidc-client`, or none.
 
@@ -212,24 +215,66 @@ A SET that was processed before is skipped after verification and before the
 handlers: PUSH still answers `202`, POLL still acknowledges it. The key is
 `iss` + `jti`, so transmitters with colliding identifiers stay apart.
 
+A SET is *claimed* in the store before its handlers run and marked processed
+afterwards. Another instance that receives the same SET meanwhile neither
+handles nor acknowledges it (PUSH answers `500`, POLL leaves it unacknowledged,
+metrics outcome `in_progress`) and the transmitter delivers it again, so a
+handler failure on the first instance is never masked by the second. A claim
+older than `dedup.lease` counts as abandoned by an instance that crashed, and
+the SET is handled again. Processing is therefore *at least once*: handlers
+must be idempotent, and may run on another instance after a crash;
+`eventContext.idempotencyKey()` is the key for their side effects.
+
 ```properties
 quarkus.openid-ssf.receiver.dedup.enabled=true       # false if the handlers are idempotent anyway
 quarkus.openid-ssf.receiver.dedup.capacity=10000     # entries of the in-memory store
+quarkus.openid-ssf.receiver.dedup.lease=60s          # longer than the longest handler
 ```
 
-With `quarkus-agroal` and a default datasource, processed SETs are remembered in
-the table `EASYSSF_PROCESSED_SET` instead, so that all instances of the
-application share them and they survive a restart:
+An `SsfJtiDedupStore` bean of the application (Redis, ...) replaces the built-in
+stores.
+
+## Database (optional)
+
+With `quarkus-agroal` and a default datasource, the state of the receiver is kept
+in the database instead of in memory, so that all instances of the application
+share it and it survives a restart:
+
+| Table | Holds |
+|---|---|
+| `EASYSSF_PROCESSED_SET` | the SETs that were processed, and those claimed while their handlers run (`STATE`) |
+| `EASYSSF_POLL_ACK` | with POLL delivery, the acknowledgements and error reports a poller owes its transmitter until a request carried them |
 
 ```properties
 quarkus.openid-ssf.receiver.jdbc.enabled=true              # the default when Agroal is present
-quarkus.openid-ssf.receiver.jdbc.initialize-schema=true    # create the table on startup; false: schema.sql of easyssf-receiver-jdbc
+quarkus.openid-ssf.receiver.jdbc.initialize-schema=true    # create and upgrade the tables on startup
 quarkus.openid-ssf.receiver.jdbc.table-prefix=EASYSSF_
-quarkus.openid-ssf.receiver.jdbc.cleanup-interval=15m
-quarkus.openid-ssf.receiver.dedup.retention=7d
+quarkus.openid-ssf.receiver.jdbc.cleanup-interval=15m      # purge of expired rows
+quarkus.openid-ssf.receiver.dedup.retention=7d             # how long a processed SET is remembered
+quarkus.openid-ssf.receiver.jdbc.ack-retention=7d          # how long an acknowledgement the transmitter never accepted is kept
+quarkus.openid-ssf.receiver.jdbc.ack-delete-batch-size=100 # acknowledgements removed per DELETE
 ```
 
-An `SsfJtiDedupStore` bean of the application (Redis, ...) replaces both.
+**Schema management.** With `initialize-schema=true` (the default) the tables are
+created on startup if they are missing, and a table of an earlier release gets
+the columns the current one needs (`STATE` of `EASYSSF_PROCESSED_SET`, added by
+easyssf 0.3.0). With `false` nothing is changed and the start fails naming the
+statements to run. An installation that owns its schema takes the scripts from
+`easyssf-receiver-jdbc`: `classpath:org/easyssf/receiver/jdbc/schema.sql` is the
+current schema for a fresh installation, and
+`classpath:org/easyssf/receiver/jdbc/migration/` holds one versioned script per
+release that changed the schema (`V0_1_0__processed_sets_and_revocations.sql`,
+`V0_3_0__dedup_state_and_poll_acks.sql`), named for Flyway and plain SQL for any
+other tool. With `quarkus-flyway`, list the location next to the application's
+own and switch the startup changes off:
+
+```properties
+quarkus.flyway.locations=db/migration,classpath:org/easyssf/receiver/jdbc/migration
+quarkus.openid-ssf.receiver.jdbc.initialize-schema=false
+```
+
+The scripts assume the default table prefix. Liquibase users include the SQL
+files in a changelog the same way.
 
 ## Delivery: PUSH
 
@@ -266,21 +311,39 @@ quarkus.openid-ssf.receiver.poll.interval=30s
 quarkus.openid-ssf.receiver.poll.start-delay=0s             # delay before the first poll
 quarkus.openid-ssf.receiver.poll.auto-start=true            # false: poll with SsfPollScheduler.pollNow()
 quarkus.openid-ssf.receiver.poll.max-events=100             # per request; a poll fetches again while moreAvailable
+quarkus.openid-ssf.receiver.poll.long-polling=false         # true: keep one request outstanding that the transmitter holds
+quarkus.openid-ssf.receiver.poll.long-polling-hold=30s      # how long the transmitter holds it (agreed with the transmitter)
 quarkus.openid-ssf.receiver.poll.rate-limit.max-backoff=5m  # cap on any pause
 #quarkus.openid-ssf.receiver.poll.rate-limit.fallback-backoff=30s   # pause after a 429 without Retry-After
 # Override only if the poll endpoint is not in the stream configuration:
 #quarkus.openid-ssf.receiver.poll.endpoint-url=https://transmitter.example/ssf/poll/<stream>
 ```
 
-The poll endpoint is taken from the `delivery.endpoint_url` of the stream the
-receiver looked up or registered. A handled SET is acknowledged right away (not
-with the next poll), an invalid one is reported in `setErrs`, one a handler
-could not process is left for the next poll. On `401` the token provider is
-asked for a new token once. A `429` (or `503` with `Retry-After`) pauses
-polling for `Retry-After`, capped by `max-backoff`; a `429` without the header
-pauses for `fallback-backoff` if set.
+Each transmitter is polled by a poller of its own on a virtual thread named
+`ssf-poller-<name>`, started with the application. The poll endpoint is taken
+from the `delivery.endpoint_url` of the stream the receiver looked up or
+registered. A handled SET is acknowledged with the request that follows (sent
+right away in short polling), an invalid one is reported in `setErrs`, one a
+handler could not process is left for the next poll. The acknowledgements wait
+in an `SsfPollAckStore` until a request carried them: in memory, or in the
+table `EASYSSF_POLL_ACK` with a datasource (see [Database](#database-optional)),
+so that a SET handled right before a restart is acknowledged afterwards instead
+of being delivered again. On shutdown the poller sends the pending
+acknowledgements with a last request.
 
-Timeouts of all calls to the transmitters are those of the HTTP client:
+**Long polling** (RFC 8936, section 2.5): with `poll.long-polling=true` the
+poller keeps one request outstanding (`returnImmediately: false`) that the
+transmitter holds for up to `long-polling-hold` until SETs are available, and
+sends the next one as soon as it handled the response, so a SET arrives at once
+instead of at the next `interval`. The request waits `long-polling-hold` plus a
+margin for the response; `http.read-timeout` does not apply to it. A
+transmitter that does not hold requests is polled every `interval` as before.
+
+On `401` the token provider is asked for a new token once. A `429` (or `503`
+with `Retry-After`) pauses polling for `Retry-After`, capped by `max-backoff`;
+a `429` without the header pauses for `fallback-backoff` if set.
+
+Timeouts of all other calls to the transmitters are those of the HTTP client:
 `quarkus.openid-ssf.receiver.http.connect-timeout` and `read-timeout` (5s each),
 plus an optional `http.user-agent`.
 
@@ -305,9 +368,10 @@ With `quarkus-micrometer` (or a registry extension) the receiver records to the
 
 | Meter | Type | Tags |
 |---|---|---|
-| `easyssf.receiver.sets` | counter | `transmitter` (the name), `delivery` ∈ {`push`, `poll`}, `outcome` ∈ {`handled`, `duplicate`, `invalid`, `unauthenticated`, `unavailable`, `failed`} |
+| `easyssf.receiver.sets` | counter | `transmitter` (the name), `delivery` ∈ {`push`, `poll`}, `outcome` ∈ {`handled`, `duplicate`, `in_progress`, `invalid`, `unauthenticated`, `unavailable`, `failed`} |
 | `easyssf.receiver.events` | counter | `transmitter`, `delivery`, `event` (the alias of the event type) |
 | `easyssf.receiver.poll` | timer | `transmitter`, `outcome` ∈ {`success`, `failure`} |
+| `easyssf.receiver.poll.pending-acks` | gauge | `transmitter`; the acknowledgements a started poller owes its transmitter |
 | `easyssf.receiver.dedup.size` | gauge | the identifiers the in-memory store remembers |
 
 The names are those of easyssf, so a Spring Boot and a Quarkus receiver share
@@ -318,9 +382,10 @@ one dashboard.
 With `quarkus-smallrye-health` the receiver reports a wellness check at
 `/q/health/well` (it does not gate readiness, a transmitter that is down must not
 take the application out of service): per transmitter whether the metadata was
-retrieved, the state of the stream registration and, with POLL, the last poll and
-its error. The check is `DOWN` when a stream cannot be used or the last poll
-failed.
+retrieved, the state of the stream registration and, with POLL, the last poll,
+its error, how the transmitter is polled (`periodic`, `long`, `manual`) and the
+acknowledgements waiting for the next request (`pendingAcks`). The check is
+`DOWN` when a stream cannot be used or the last poll failed.
 
 ## Event type aliases
 
@@ -463,12 +528,9 @@ semantics.
 
 ## Out of scope (today)
 
-- A durable store of pending poll acknowledgements: acknowledgements are sent
-  right after a SET was handled, a SET that was not acknowledged is delivered
-  again by the transmitter.
-- Per-event-type CAEP / RISC parsing beyond the subject: `SsfEventContext`
-  exposes the raw event payloads, consumers parse what they care about. SCIM
-  Events are the exception, see [SCIM Events](#scim-events-rfc-9967).
+- Exactly-once processing: a SET may reach a handler more than once, after a
+  handler failed or on another instance after a crash. The stores make it rare,
+  `idempotencyKey()` makes it harmless.
 - Calling the SCIM service provider: fetching the resource after a `notice`
   event, asynchronous SCIM requests and the `Set-Txn` header are left to the
   application.

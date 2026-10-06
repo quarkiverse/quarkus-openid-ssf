@@ -385,7 +385,7 @@ endif::add-copy-button-to-config-props[]
 
 [.description]
 --
-Whether the transmitter is polled periodically. Set to `false` to drive polling from application code with `SsfPollScheduler.pollNow()`.
+Whether the transmitter is polled by the extension, on a virtual thread of its own per transmitter: every `interval`, or with one request outstanding when `long-polling` is on. Set to `false` to drive polling from application code with `SsfPollScheduler.pollNow()`.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -437,7 +437,7 @@ endif::add-copy-button-to-config-props[]
 
 [.description]
 --
-Time between two polls.
+Time between two polls. With `long-polling`, the pause after a failed request, or after a transmitter that does not hold requests answered an empty one at once. Also the pause before the next attempt when the poll endpoint of the stream was not known yet at the first one, as the stream is looked up in the background; set `endpoint-url` to poll right at startup.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -445,6 +445,58 @@ Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_PO
 endif::add-copy-button-to-env-var[]
 ifndef::add-copy-button-to-env-var[]
 Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_POLL_INTERVAL+++`
+endif::add-copy-button-to-env-var[]
+--
+|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
+|`+++30S+++`
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-long-polling]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-long-polling[`quarkus.openid-ssf.receiver.poll.long-polling`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.long-polling+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`quarkus.openid-ssf.receiver."transmitter-name".poll.long-polling`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".poll.long-polling+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+Long polling (RFC 8936, section 2.5): the poller keeps one request outstanding that the transmitter holds until SETs are available or `long-polling-hold` elapses, instead of asking every `interval` whether there is something. A SET is then fetched as soon as the transmitter has it. The transmitter has to support long polling; one that answers at once is polled every `interval` as with `false`.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_POLL_LONG_POLLING+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_POLL_LONG_POLLING+++`
+endif::add-copy-button-to-env-var[]
+--
+|boolean
+|`+++false+++`
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-long-polling-hold]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-poll-long-polling-hold[`quarkus.openid-ssf.receiver.poll.long-polling-hold`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.poll.long-polling-hold+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`quarkus.openid-ssf.receiver."transmitter-name".poll.long-polling-hold`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".poll.long-polling-hold+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+How long the transmitter holds a long poll request, part of the agreement with it (RFC 8936, section 2.2). The request waits that long plus a margin for the response, `http.read-timeout` does not apply to it.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_POLL_LONG_POLLING_HOLD+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_POLL_LONG_POLLING_HOLD+++`
 endif::add-copy-button-to-env-var[]
 --
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
@@ -1142,6 +1194,27 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
 |`+++7D+++`
 
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-lease]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-lease[`quarkus.openid-ssf.receiver.dedup.lease`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.dedup.lease+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+How long a SET stays claimed while its handlers run. A SET is claimed in the store before the handlers run and marked processed afterwards; another instance that receives the same SET meanwhile neither handles nor acknowledges it, the transmitter delivers it again. A claim older than the lease counts as abandoned by an instance that crashed, and the SET is handled again. Set it longer than the longest handler.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_DEDUP_LEASE+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_DEDUP_LEASE+++`
+endif::add-copy-button-to-env-var[]
+--
+|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
+|`+++60S+++`
+
 a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-enabled]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-enabled[`quarkus.openid-ssf.receiver.jdbc.enabled`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.jdbc.enabled+++[]
@@ -1150,7 +1223,7 @@ endif::add-copy-button-to-config-props[]
 
 [.description]
 --
-Whether processed SETs are remembered in the default datasource of the application, if it has one (`quarkus-agroal`), so that all instances of the application share them and they survive a restart. Otherwise they are kept in memory.
+Whether the state of the receiver is kept in the default datasource of the application, if it has one (`quarkus-agroal`), so that all instances of the application share it and it survives a restart: the processed SETs (`<prefix>PROCESSED_SET`) and, with POLL delivery, the acknowledgements a poller owes its transmitter (`<prefix>POLL_ACK`). Otherwise both are kept in memory.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -1171,7 +1244,7 @@ endif::add-copy-button-to-config-props[]
 
 [.description]
 --
-Whether the table is created at startup if it does not exist. With `false` the table has to be created with the statements in `classpath:org/easyssf/receiver/jdbc/schema.sql`, for example by a schema migration, and the start fails if it is missing.
+Whether the tables are created at startup if they do not exist, and columns a release added are added to an existing table. With `false` the tables have to be created with the statements in `classpath:org/easyssf/receiver/jdbc/schema.sql` (a fresh installation) or the versioned scripts in `classpath:org/easyssf/receiver/jdbc/migration/` (Flyway naming, plain SQL), for example by a schema migration, and the start fails naming the statements to run if a table or a column is missing.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -1213,7 +1286,7 @@ endif::add-copy-button-to-config-props[]
 
 [.description]
 --
-How often expired rows (processed SETs past `dedup.retention`) are purged. The store also purges when it is written to; `0` turns the periodic cleanup off.
+How often expired rows (processed SETs past `dedup.retention`, acknowledgements past `jdbc.ack-retention`) are purged. The stores also purge when they are written to; `0` turns the periodic cleanup off.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -1225,6 +1298,48 @@ endif::add-copy-button-to-env-var[]
 --
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
 |`+++15M+++`
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-ack-retention]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-ack-retention[`quarkus.openid-ssf.receiver.jdbc.ack-retention`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.jdbc.ack-retention+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+How long an acknowledgement or error report the transmitter never accepted is kept in the `<prefix>POLL_ACK` table.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_JDBC_ACK_RETENTION+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_JDBC_ACK_RETENTION+++`
+endif::add-copy-button-to-env-var[]
+--
+|link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
+|`+++7D+++`
+
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-ack-delete-batch-size]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-jdbc-ack-delete-batch-size[`quarkus.openid-ssf.receiver.jdbc.ack-delete-batch-size`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.jdbc.ack-delete-batch-size+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+How many acknowledgements one `DELETE` statement removes from the `<prefix>POLL_ACK` table (`JTI IN (...)`). Databases limit the number of parameters of a statement (SQL Server to 2100, Oracle to 1000 list members); a smaller batch means more statements per poll.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_JDBC_ACK_DELETE_BATCH_SIZE+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_JDBC_ACK_DELETE_BATCH_SIZE+++`
+endif::add-copy-button-to-env-var[]
+--
+|int
+|`+++100+++`
 
 |===
 

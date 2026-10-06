@@ -26,16 +26,16 @@ conformance suite results of easyssf.
 | SET verification | `NimbusSsfSetVerifier`, JWK Set caching, `IssuerRoutingSsfSetVerifier` | config of algorithms, key size, type header, clock skew, audience |
 | Processing | `SsfSetProcessor`: verify, stream verification state, dedup, handlers, metrics | the handler list from `Instance<SsfEventHandler>`, ordered by `@Priority` |
 | PUSH | `SsfPushHandler.handle(authHeader, body)` → `SsfPushResponse` | `SsfPushRoute`: Vert.x route, `BodyHandler`, blocking handler |
-| POLL | `SsfPoller.pollNow()`: requests, acks, error reports, `Retry-After` | `SsfPollScheduler`: a Vert.x periodic timer per transmitter runs `pollNow()` on a virtual thread; easyssf's own scheduler thread is never started |
+| POLL | `SsfPoller`: `start()` runs the loop on a thread from its `ThreadFactory` (periodic or long polling), `pollNow()`, acks and error reports in an `SsfPollAckStore` (`InMemorySsfPollAckStore`, `JdbcSsfPollAckStore`), `Retry-After`, the pending-acks gauge | `SsfTransmitterFactory` configures the poller from `poll.*` with a virtual thread named `ssf-poller-<name>`; `SsfPollScheduler` starts it at startup (unless `poll.auto-start=false`) and stops it first on shutdown; producers for the ack store |
 | Stream | `SsfStreamClient`, `SsfStreamRegistrar` (background virtual thread, retries, delete on shutdown), `SsfReceiverStream`, `SsfStreamVerification` | `SsfReceiverLifecycle` starts and stops the registry with the application; `SsfReceiverStreamClient` is the convenience surface for the default transmitter |
 | HTTP | `SsfHttpClient`, `JdkSsfHttpClient` | timeouts and user agent from config, replaceable bean |
 | Tokens | `SsfTransmitterTokenProvider`, `ClientCredentialsSsfTransmitterTokenProvider` | `StaticTransmitterTokenProvider`, `OidcTransmitterTokenProvider` over `quarkus-oidc-client`, `NoopTransmitterTokenProvider`; the choice per transmitter at runtime |
-| Dedup | `SsfJtiDedupStore`, `InMemorySsfJtiDedupStore`, `JdbcSsfJtiDedupStore` (`easyssf-receiver-jdbc`) | producers: in-memory, or JDBC over the default Agroal datasource with schema creation and cleanup |
-| Metrics | `SsfReceiverMetrics`, `MicrometerSsfReceiverMetrics` | registered when `quarkus-micrometer` is present, plus the dedup size gauge |
-| Health | `SsfStreamRegistrar.getState()`, `SsfPoller.getLast*()` | `SsfReceiverHealthCheck` (`@Wellness`) when `quarkus-smallrye-health` is present |
+| Dedup | `SsfJtiDedupStore` (`claim` / `processed` / `forget` with a lease), `InMemorySsfJtiDedupStore`, `JdbcSsfJtiDedupStore` (`easyssf-receiver-jdbc`), `SsfSetInProgressException` | producers: in-memory, or JDBC over the default Agroal datasource with schema creation, upgrades (`JdbcSsfSchema.prepareTable` with `processedSetUpgrades`) and cleanup; `dedup.lease` |
+| Metrics | `SsfReceiverMetrics`, `MicrometerSsfReceiverMetrics` (the pending-acks gauge is registered by `SsfPoller.start()`) | registered when `quarkus-micrometer` is present, plus the dedup size gauge |
+| Health | `SsfStreamRegistrar.getState()`, `SsfPoller.getLast*()`, `getPendingAckCount()` | `SsfReceiverHealthCheck` (`@Wellness`) when `quarkus-smallrye-health` is present |
 | Aliases | `SsfEventTypes` (built-in SSF, CAEP, RISC, SCIM aliases, `registerAlias`) | `event-aliases.*` registered at startup |
 | SCIM Events | `SsfScimEvent`, `SsfScimSubject`, `SsfScimOperation` (easyssf-core), `SsfScimEventHandler` (easyssf-receiver) | nothing: a bean extending `SsfScimEventHandler` is an `SsfEventHandler`; `example-scim-provisioning` |
-| Dev UI | | `SsfDevJsonRpcService` and two pages |
+| Dev UI | | `SsfDevJsonRpcService` and two pages; `pollStatus()` shows the pollers |
 | Tests | `easyssf-test`: `TestTransmitter` | `QuarkusExtensionTest`s in `receiver/deployment`, see below |
 
 Nothing in easyssf-core or easyssf-receiver uses reflection or Jackson; JSON is
@@ -52,7 +52,9 @@ that serialize them.
 transmitters: `quarkus.openid-ssf.receiver.<name>.*` is the same
 `SsfTransmitterConfig` for another transmitter. The idiom of `quarkus.oidc`.
 Receiver-wide groups (`push.endpoint-path`, `http.*`, `dedup.*`, `jdbc.*`,
-`event-aliases.*`) sit next to them; SmallRye Config matches exact property
+`event-aliases.*`) sit next to them; `poll.long-polling` and
+`poll.long-polling-hold` carry the names of the Spring Boot starter, so both
+integrations share one vocabulary; SmallRye Config matches exact property
 names before map keys, so the receiver-wide `push.endpoint-path` and the default
 transmitter's `push.expected-auth-header` coexist under `push.`.
 
@@ -75,16 +77,21 @@ Startup order (`StartupEvent` observer priorities):
 |---|---|---|
 | `Router` observer | `SsfPushRoute` | registers the push route when a configured transmitter delivers by PUSH |
 | 200 | `SsfReceiverLifecycle` | registers the event aliases, builds the transmitters (configuration errors fail the start), `SsfTransmitters.start()` (the registrars), resolves the metadata in the background for the log, starts the JDBC cleanup |
-| 300 | `SsfPollScheduler` | schedules a Vert.x periodic timer per transmitter with POLL delivery and `poll.auto-start=true` |
+| 300 | `SsfPollScheduler` | `SsfPoller.start()` for every transmitter with POLL delivery and `poll.auto-start=true`; the thread factory of the poller gives a virtual thread `ssf-poller-<name>` |
 
-Shutdown stops the timers, the registrars (deleting the streams when
-`delete-on-shutdown`) and the cleanup.
+Shutdown: `SsfPollScheduler` (`ShutdownEvent` priority 100) stops the pollers
+first, which flushes the pending acknowledgements to the transmitter with a last
+request and removes them from the JDBC store, then `SsfReceiverLifecycle`
+(default priority) stops the registrars (deleting the streams when
+`delete-on-shutdown`) and the cleanup. Agroal closes the datasource when the
+container shuts down, after the observers.
 
 The processor decides nothing at build time except which optional
 integrations exist, by capability: `io.quarkus.oidc.client`
 (`OidcClientTransmitterTokenProviders`), `io.quarkus.metrics`
 (`MicrometerSsfReceiverMetricsProducer`), `io.quarkus.agroal`
-(`JdbcSsfJtiDedupStoreProducer` instead of the in-memory producer) and
+(`JdbcSsfJtiDedupStoreProducer` and `JdbcSsfPollAckStoreProducer` instead of the
+in-memory producers) and
 `io.quarkus.smallrye.health` (`SsfReceiverHealthCheck`). Their classes are named
 by string so that they are only loaded when the extension they need is present.
 
@@ -97,9 +104,13 @@ before the `202`; a failing handler is a `500` and the transmitter delivers the
 SET again. That is what RFC 8935 and the conformance suite expect, and it is
 the behaviour change of 0.2.0.
 
-**POLL**: timer tick → virtual thread → `SsfPoller.pollNow()`: skipped while a
-poll runs or the transmitter asked to wait, fetches while `moreAvailable`,
-acknowledges handled SETs and reports invalid ones right away.
+**POLL**: the poller's own virtual thread → `SsfPoller` loop: sleeps the
+interval (short polling) or sends the next request at once (long polling, the
+transmitter holds it), skipped while the transmitter asked to wait, fetches
+while `moreAvailable`, records acknowledgements and error reports in the
+`SsfPollAckStore` and sends them with the next request (right away in short
+polling). `SsfSetProcessor` claims each SET in the dedup store before the
+handlers run; a SET another instance holds is left unacknowledged.
 
 ## Tests
 
@@ -119,8 +130,10 @@ the native binary in the native workflow.
 ## Decisions
 
 - **Handlers before the response** (D1 of the plan): adopted from easyssf.
-- **No poll acknowledgement store SPI** (D2): acknowledgements are sent right
-  after handling; durability, if ever needed, belongs in easyssf.
+- **Poll acknowledgement store from easyssf** (D2 of the 0.2.0 plan, revisited
+  with easyssf 0.3.0): the extension dropped its own `SsfPollAckStore` SPI in
+  0.2.0; easyssf 0.3.0 brought one back, with a JDBC implementation, and the
+  extension only produces the bean.
 - **Metric names of easyssf** (D3): one dashboard for Spring Boot and Quarkus
   receivers.
 - **Issuer aliases become transmitter names** (D4): the `transmitter` tag is the
@@ -131,8 +144,18 @@ the native binary in the native workflow.
   the examples want the stream of the default transmitter without its id.
 - **Several transmitters** (D7): done in the same release, the registry is there
   anyway.
-- **Vert.x timer, not easyssf's scheduler thread**: polling runs on the
-  application's event infrastructure and shows up in its thread dumps; the
-  virtual thread per poll keeps the event loop and worker pool free.
+- **The poller's own loop, not a Vert.x timer** (since 0.4.0): easyssf 0.3.0
+  runs the loop on a thread from a `ThreadFactory`, which long polling needs
+  (one request always outstanding) and which registers the pending-acks gauge
+  and flushes the acknowledgements on `stop()`. One code path for short and long
+  polling; the thread is a virtual one named per transmitter, so nothing blocks
+  the event loop or the worker pool. `pollNow()` stays for
+  `poll.auto-start=false`.
+- **`initialize-schema` stays a boolean** (D4 of the 0.3.0 plan): `true` creates
+  and upgrades, `false` refuses with the statements to run; Quarkus Dev Services
+  already decide what is embedded, so the Spring Boot enum
+  (`embedded`/`always`/`never`) adds nothing here.
+- **No `synchronized`**: the extension's code locks with `ReentrantLock`, as
+  `synchronized` pins virtual threads before JDK 24 and the project targets 21.
 - **Metadata at startup in the background**: a transmitter that is down shows up
   in the log before the first SET without holding the start up.
