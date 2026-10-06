@@ -29,9 +29,9 @@ import io.restassured.config.EncoderConfig;
 import io.restassured.http.ContentType;
 
 /**
- * A {@code PROCESSED_SET} table of easyssf 0.1.0 (no {@code STATE} column, created here
- * by the {@code INIT} script of the H2 URL) is upgraded on startup with
- * {@code jdbc.initialize-schema=true}, and the receiver de-duplicates through it.
+ * A {@code PROCESSED_SET} table of easyssf 0.1.0 (no {@code STATE} column, {@code PROCESSED_AT}
+ * not yet renamed, created here by the {@code INIT} script of the H2 URL) is upgraded on
+ * startup with {@code jdbc.initialize-schema=true}, and the receiver de-duplicates through it.
  */
 public class JdbcSchemaUpgradeTest {
 
@@ -73,11 +73,11 @@ public class JdbcSchemaUpgradeTest {
     }
 
     @Test
-    @DisplayName("The STATE column was added to the old table, and a duplicate reaches the handler once")
+    @DisplayName("STATE was added and PROCESSED_AT renamed in the old table, and a duplicate reaches the handler once")
     void tableUpgraded() throws Exception {
         try (Connection connection = dataSource.getConnection();
                 Statement statement = connection.createStatement();
-                ResultSet rows = statement.executeQuery("SELECT STATE, PROCESSED_AT FROM TEST_PROCESSED_SET")) {
+                ResultSet rows = statement.executeQuery("SELECT STATE, STATE_CHANGED_AT FROM TEST_PROCESSED_SET")) {
             assertEquals(2, rows.getMetaData().getColumnCount());
         }
 

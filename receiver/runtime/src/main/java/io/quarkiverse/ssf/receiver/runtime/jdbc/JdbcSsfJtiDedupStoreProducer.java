@@ -32,7 +32,8 @@ import io.quarkus.arc.InjectableInstance;
  *
  * <p>
  * With {@code jdbc.initialize-schema=true} the table is created if it is missing and
- * gets the columns a release added ({@code STATE} in easyssf 0.3.0); with {@code false}
+ * gets the columns a release added ({@code STATE} in easyssf 0.3.0, {@code PROCESSED_AT}
+ * renamed to {@code STATE_CHANGED_AT} in 0.4.0); with {@code false}
  * the start fails naming the statements to run.
  */
 @Singleton
