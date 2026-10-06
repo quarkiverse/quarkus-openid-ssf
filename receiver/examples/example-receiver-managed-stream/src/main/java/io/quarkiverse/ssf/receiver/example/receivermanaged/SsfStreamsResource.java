@@ -76,7 +76,7 @@ public class SsfStreamsResource {
         }
     }
 
-    /** POST /streams/default/status?status=paused&reason=... */
+    /** {@code POST /streams/default/status?status=paused&reason=...} */
     @POST
     @Path("/{alias}/status")
     @Produces(MediaType.APPLICATION_JSON)
