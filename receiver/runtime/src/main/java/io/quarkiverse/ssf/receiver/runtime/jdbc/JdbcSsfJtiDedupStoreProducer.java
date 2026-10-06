@@ -14,6 +14,7 @@ import org.easyssf.receiver.jdbc.JdbcSsfJtiDedupStore;
 import org.easyssf.receiver.jdbc.JdbcSsfSchema;
 import org.easyssf.receiver.jdbc.JdbcSsfStoreCleanup;
 import org.easyssf.receiver.jdbc.SsfJdbcOperations;
+import org.easyssf.receiver.poll.SsfPollAckStore;
 import org.easyssf.receiver.set.InMemorySsfJtiDedupStore;
 import org.easyssf.receiver.set.SsfJtiDedupStore;
 import org.jboss.logging.Logger;
@@ -67,15 +68,18 @@ public class JdbcSsfJtiDedupStoreProducer {
     }
 
     /**
-     * Purges the expired rows of the JDBC store every {@code jdbc.cleanup-interval}; the
+     * Purges the expired rows of the JDBC stores every {@code jdbc.cleanup-interval}; the
      * {@code SsfReceiverLifecycle} starts and stops it.
      */
     @Produces
     @Singleton
     @DefaultBean
-    public JdbcSsfStoreCleanup storeCleanup(SsfJtiDedupStore dedupStore) {
+    public JdbcSsfStoreCleanup storeCleanup(SsfJtiDedupStore dedupStore, SsfPollAckStore ackStore) {
         List<JdbcSsfExpiringStore> stores = new ArrayList<>();
         if (dedupStore instanceof JdbcSsfExpiringStore expiring) {
+            stores.add(expiring);
+        }
+        if (ackStore instanceof JdbcSsfExpiringStore expiring) {
             stores.add(expiring);
         }
         return new JdbcSsfStoreCleanup(stores, config.jdbc().cleanupInterval());

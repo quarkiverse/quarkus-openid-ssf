@@ -28,7 +28,8 @@ import io.smallrye.config.WithUnnamedKey;
  * {@code quarkus.openid-ssf.receiver.*} configure the {@code default} transmitter;
  * {@code quarkus.openid-ssf.receiver.<name>.*} configures a further, named transmitter,
  * each complete on its own. Everything else is shared by all transmitters: the push
- * endpoint, the HTTP client, de-duplication and the event type aliases.
+ * endpoint, the HTTP client, de-duplication, the database stores and the event type
+ * aliases.
  */
 @ConfigRoot(phase = ConfigPhase.RUN_TIME)
 @ConfigMapping(prefix = "quarkus.openid-ssf.receiver")
@@ -180,10 +181,12 @@ public interface SsfReceiverConfig {
 
     interface Jdbc {
         /**
-         * Whether processed SETs are remembered in the default datasource of the
+         * Whether the state of the receiver is kept in the default datasource of the
          * application, if it has one ({@code quarkus-agroal}), so that all instances of
-         * the application share them and they survive a restart. Otherwise they are kept
-         * in memory.
+         * the application share it and it survives a restart: the processed SETs
+         * ({@code <prefix>PROCESSED_SET}) and, with POLL delivery, the acknowledgements
+         * a poller owes its transmitter ({@code <prefix>POLL_ACK}). Otherwise both are
+         * kept in memory.
          */
         @WithDefault("true")
         boolean enabled();
@@ -206,11 +209,27 @@ public interface SsfReceiverConfig {
         String tablePrefix();
 
         /**
-         * How often expired rows (processed SETs past {@code dedup.retention}) are
-         * purged. The store also purges when it is written to; {@code 0} turns the
-         * periodic cleanup off.
+         * How often expired rows (processed SETs past {@code dedup.retention},
+         * acknowledgements past {@code jdbc.ack-retention}) are purged. The stores also
+         * purge when they are written to; {@code 0} turns the periodic cleanup off.
          */
         @WithDefault("15m")
         Duration cleanupInterval();
+
+        /**
+         * How long an acknowledgement or error report the transmitter never accepted is
+         * kept in the {@code <prefix>POLL_ACK} table.
+         */
+        @WithDefault("7d")
+        Duration ackRetention();
+
+        /**
+         * How many acknowledgements one {@code DELETE} statement removes from the
+         * {@code <prefix>POLL_ACK} table ({@code JTI IN (...)}). Databases limit the
+         * number of parameters of a statement (SQL Server to 2100, Oracle to 1000 list
+         * members); a smaller batch means more statements per poll.
+         */
+        @WithDefault("100")
+        int ackDeleteBatchSize();
     }
 }
