@@ -66,11 +66,6 @@ final class TestTransmitters {
         return "test.ssf." + id + ".token-uri";
     }
 
-    /** The poll endpoint of the transmitter, for {@code poll.endpoint-url}. */
-    static String pollUriProperty(String id) {
-        return "test.ssf." + id + ".poll-uri";
-    }
-
     /** {@code ${...}} reference to a system property, for {@code overrideConfigKey}. */
     static String ref(String property) {
         return "${" + property + "}";
@@ -85,7 +80,6 @@ final class TestTransmitters {
         instances().put(id, transmitter);
         System.setProperty(issuerProperty(id), transmitter.issuer());
         System.setProperty(tokenUriProperty(id), transmitter.tokenUri());
-        System.setProperty(pollUriProperty(id), transmitter.pollUri());
         return transmitter;
     }
 
@@ -113,7 +107,6 @@ final class TestTransmitters {
         System.clearProperty(issuerProperty(id));
         System.clearProperty(streamIdProperty(id));
         System.clearProperty(tokenUriProperty(id));
-        System.clearProperty(pollUriProperty(id));
     }
 
     /** The test archive, with the given beans and the parent-first class loading. */

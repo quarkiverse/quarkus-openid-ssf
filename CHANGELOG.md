@@ -4,6 +4,9 @@
 
 ### Changed
 
+- easyssf 0.5.0: the first poll follows the registration of the stream at once.
+  The registrar wakes the poller up, and a poller that starts before the stream
+  is registered looks again after a second instead of waiting `poll.interval`.
 - easyssf 0.4.0: the column `PROCESSED_AT` of `EASYSSF_PROCESSED_SET` is now
   `STATE_CHANGED_AT`, as it has recorded the time of the claim as well as that of
   the completion since 0.3.0. Existing tables are renamed on startup with

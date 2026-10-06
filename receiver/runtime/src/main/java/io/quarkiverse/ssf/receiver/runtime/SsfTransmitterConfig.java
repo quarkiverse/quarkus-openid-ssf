@@ -170,9 +170,7 @@ public interface SsfTransmitterConfig {
         /**
          * Time between two polls. With {@code long-polling}, the pause after a failed
          * request, or after a transmitter that does not hold requests answered an empty
-         * one at once. Also the pause before the next attempt when the poll endpoint of
-         * the stream was not known yet at the first one, as the stream is looked up in
-         * the background; set {@code endpoint-url} to poll right at startup.
+         * one at once. The first poll follows the registration of the stream at once.
          */
         @WithDefault("30s")
         Duration interval();

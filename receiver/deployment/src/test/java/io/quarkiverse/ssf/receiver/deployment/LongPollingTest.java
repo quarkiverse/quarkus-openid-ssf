@@ -57,10 +57,6 @@ public class LongPollingTest {
             .overrideConfigKey("quarkus.openid-ssf.receiver.stream-id",
                     TestTransmitters.ref(TestTransmitters.streamIdProperty(TestTransmitters.DEFAULT)))
             .overrideConfigKey("quarkus.openid-ssf.receiver.delivery-method", "POLL")
-            // known at startup: a first attempt before the registrar learned the endpoint of the
-            // stream would make the poller wait the (long) interval before trying again
-            .overrideConfigKey("quarkus.openid-ssf.receiver.poll.endpoint-url",
-                    TestTransmitters.ref(TestTransmitters.pollUriProperty(TestTransmitters.DEFAULT)))
             .overrideConfigKey("quarkus.openid-ssf.receiver.poll.long-polling", "true")
             .overrideConfigKey("quarkus.openid-ssf.receiver.poll.long-polling-hold", "3s")
             // only a held request can deliver a SET within the test's patience
@@ -86,7 +82,7 @@ public class LongPollingTest {
     }
 
     @Test
-    @DisplayName("poll.long-polling=true -> the started poller keeps a held request outstanding")
+    @DisplayName("poll.long-polling=true -> the started poller keeps a held request outstanding, from the registration on")
     void holdsARequest() {
         assertTrue(poller.isLongPolling());
         assertTrue(poller.isRunning());
