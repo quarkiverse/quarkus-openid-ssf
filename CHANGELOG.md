@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.5.0 (unreleased)
+## 0.5.0
+
+Two easyssf releases, with nothing to change in an application: easyssf 0.5.0
+makes the first poll follow the registration of the stream at once instead of up
+to an interval later, and easyssf 0.4.0 renames the column `PROCESSED_AT` of
+`EASYSSF_PROCESSED_SET` to `STATE_CHANGED_AT`, which the receiver applies on
+startup where it may change the schema.
 
 ### Changed
 
