@@ -1,6 +1,9 @@
 package io.quarkiverse.ssf.receiver.runtime.devui;
 
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -15,6 +18,7 @@ import org.easyssf.core.event.SsfSubjectIdentifiers;
 import org.easyssf.core.metadata.SsfTransmitterMetadata;
 import org.easyssf.core.stream.SsfStreamConfiguration;
 import org.easyssf.core.stream.SsfStreamStatus;
+import org.easyssf.receiver.poll.SsfPoller;
 import org.easyssf.receiver.stream.SsfStreamException;
 import org.easyssf.receiver.stream.SsfStreamRegistrar;
 import org.easyssf.receiver.transmitter.SsfTransmitter;
@@ -26,8 +30,9 @@ import io.quarkiverse.ssf.receiver.runtime.stream.SsfReceiverStreamClient;
 
 /**
  * JSON-RPC backend of the Dev UI pages: transmitter metadata, the stream of the receiver
- * at the default transmitter, its status, subjects and verification. Lives in the runtime
- * artifact so that Arc wires its dependencies.
+ * at the default transmitter, its status, subjects and verification, and the pollers of
+ * the transmitters with POLL delivery. Lives in the runtime artifact so that Arc wires
+ * its dependencies.
  */
 @Singleton
 public class SsfDevJsonRpcService {
@@ -133,6 +138,40 @@ public class SsfDevJsonRpcService {
         return streamClient.status();
     }
 
+    /**
+     * The pollers of the transmitters with POLL delivery, from what the receiver knows:
+     * the transmitter is not called. Empty when every transmitter delivers by PUSH.
+     */
+    public List<PollStatus> pollStatus() {
+        List<PollStatus> result = new ArrayList<>();
+        if (!config.enabled()) {
+            return result;
+        }
+        for (SsfTransmitter transmitter : transmitters.get().all()) {
+            SsfPoller poller = transmitter.getPoller();
+            if (poller == null) {
+                continue;
+            }
+            SsfTransmitterConfig.Poll poll = transmitterConfig(transmitter).poll();
+            Instant pausedUntil = poller.getPausedUntil();
+            Integer pendingAcks;
+            String pendingAcksError = null;
+            try {
+                pendingAcks = poller.getPendingAckCount();
+            } catch (RuntimeException e) {
+                pendingAcks = null;
+                pendingAcksError = String.valueOf(e.getMessage());
+            }
+            result.add(new PollStatus(transmitter.getName(), transmitter.getIssuer(), poll.autoStart(),
+                    poller.isRunning(), poller.isLongPolling(), poll.interval().toString(),
+                    poller.isLongPolling() ? poll.longPollingHold().toString() : null, poll.maxEvents(),
+                    text(poller.getLastPollAt()), text(poller.getLastSuccessfulPollAt()), poller.getLastPollError(),
+                    (pausedUntil != null && pausedUntil.isAfter(Instant.now())) ? pausedUntil.toString() : null,
+                    pendingAcks, pendingAcksError));
+        }
+        return result;
+    }
+
     public Map<String, Object> streamConfiguration() {
         return toMap(streamClient.configuration());
     }
@@ -234,6 +273,21 @@ public class SsfDevJsonRpcService {
     }
 
     public record VerificationRequested(String state) {
+    }
+
+    /**
+     * What the Dev UI shows about one poller.
+     *
+     * @param autoStart whether the extension polls, or the application calls
+     *        {@code SsfPollScheduler.pollNow()}
+     * @param running whether the poller thread runs
+     * @param pendingAcks acknowledgements waiting for the next request, {@code null} if
+     *        the store could not be read ({@code pendingAcksError})
+     */
+    public record PollStatus(String transmitterName, String transmitterIssuer, boolean autoStart, boolean running,
+            boolean longPolling, String interval, String longPollingHold, int maxEvents, String lastPoll,
+            String lastSuccessfulPoll, String pollError, String pausedUntil, Integer pendingAcks,
+            String pendingAcksError) {
     }
 
     public record SubjectOperationResult(String operation, Map<String, Object> subject) {

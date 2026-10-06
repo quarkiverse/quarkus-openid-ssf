@@ -2,7 +2,9 @@ package io.quarkiverse.ssf.receiver.deployment;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -44,11 +46,13 @@ public class EnabledFalseTest {
     }
 
     @Test
-    @DisplayName("Push endpoint is not registered -> POST /ssf/push is 404")
+    @DisplayName("Push endpoint is not registered -> POST /ssf/push is not accepted")
     void pushRouteNotRegistered() {
+        // 404 without a route; 405 with quarkus-smallrye-health on the test classpath, whose
+        // routes make the router answer that for an unmatched method. Either way no SET is taken.
         given().header("Content-Type", "text/plain").body("anything")
                 .when().post("/ssf/push")
-                .then().statusCode(404);
+                .then().statusCode(anyOf(is(404), is(405)));
     }
 
     @Test
