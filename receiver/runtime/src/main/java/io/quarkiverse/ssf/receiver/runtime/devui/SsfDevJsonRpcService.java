@@ -276,13 +276,14 @@ public class SsfDevJsonRpcService {
     }
 
     /**
-     * What the Dev UI shows about one poller.
-     *
-     * @param autoStart whether the extension polls, or the application calls
-     *        {@code SsfPollScheduler.pollNow()}
-     * @param running whether the poller thread runs
-     * @param pendingAcks acknowledgements waiting for the next request, {@code null} if
-     *        the store could not be read ({@code pendingAcksError})
+     * What the Dev UI shows about one poller: the transmitter, whether the extension polls
+     * ({@code autoStart}; otherwise the application calls
+     * {@code SsfPollScheduler.pollNow()}) and whether the poller thread runs, the mode
+     * (long polling with its hold, or the interval) and the batch size, the last poll,
+     * the last successful one, the error of the last one and a pause the transmitter
+     * asked for, and the acknowledgements waiting for the next request
+     * ({@code pendingAcks}, {@code null} with the reason in {@code pendingAcksError} if
+     * the store could not be read).
      */
     public record PollStatus(String transmitterName, String transmitterIssuer, boolean autoStart, boolean running,
             boolean longPolling, String interval, String longPollingHold, int maxEvents, String lastPoll,
