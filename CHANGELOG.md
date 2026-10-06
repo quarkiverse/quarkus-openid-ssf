@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0 (unreleased)
+## 0.4.0
 
 POLL delivery that survives restarts and runs on several instances, through
 easyssf 0.3.0: the acknowledgements a poller owes its transmitter wait in a
