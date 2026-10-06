@@ -437,7 +437,7 @@ endif::add-copy-button-to-config-props[]
 
 [.description]
 --
-Time between two polls. With `long-polling`, the pause after a failed request, or after a transmitter that does not hold requests answered an empty one at once. Also the pause before the next attempt when the poll endpoint of the stream was not known yet at the first one, as the stream is looked up in the background; set `endpoint-url` to poll right at startup.
+Time between two polls. With `long-polling`, the pause after a failed request, or after a transmitter that does not hold requests answered an empty one at once. The first poll follows the registration of the stream at once.
 
 
 ifdef::add-copy-button-to-env-var[]
