@@ -2,6 +2,16 @@
 
 ## 0.5.0 (unreleased)
 
+### Changed
+
+- easyssf 0.4.0: the column `PROCESSED_AT` of `EASYSSF_PROCESSED_SET` is now
+  `STATE_CHANGED_AT`, as it has recorded the time of the claim as well as that of
+  the completion since 0.3.0. Existing tables are renamed on startup with
+  `jdbc.initialize-schema=true`
+  (`ALTER TABLE EASYSSF_PROCESSED_SET RENAME COLUMN PROCESSED_AT TO STATE_CHANGED_AT`,
+  the migration script `V0_4_0__state_changed_at.sql`); with `false` the start
+  names the statement.
+
 ## 0.4.0
 
 POLL delivery that survives restarts and runs on several instances, through

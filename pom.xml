@@ -37,7 +37,7 @@
 
         <quarkus.version>3.27.6</quarkus.version>
         <!-- The protocol implementation shared with the Spring Boot starter. -->
-        <easyssf.version>0.3.0</easyssf.version>
+        <easyssf.version>0.4.0</easyssf.version>
         <sundrio.version>0.300.0</sundrio.version>
 
         <!-- Surefire's @{argLine} placeholder for plugin chaining (Jacoco etc). -->

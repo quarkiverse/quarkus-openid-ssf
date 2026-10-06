@@ -43,9 +43,11 @@ public class JdbcSchemaUpgradeRefusedTest {
                 for (Throwable t = failure; t != null; t = t.getCause()) {
                     messages += t.getMessage() + "\n";
                 }
-                assertThat(messages, containsString("lacks the column(s) [STATE]"));
+                assertThat(messages, containsString("lacks the column(s) [STATE, STATE_CHANGED_AT]"));
                 assertThat(messages, containsString(
                         "ALTER TABLE TEST_PROCESSED_SET ADD STATE VARCHAR(16) DEFAULT 'PROCESSED' NOT NULL"));
+                assertThat(messages, containsString(
+                        "ALTER TABLE TEST_PROCESSED_SET RENAME COLUMN PROCESSED_AT TO STATE_CHANGED_AT"));
                 assertThat(messages, containsString("classpath:org/easyssf/receiver/jdbc/migration/"));
                 assertThat(messages, containsString("quarkus.openid-ssf.receiver.jdbc.initialize-schema=true"));
             });

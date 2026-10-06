@@ -242,7 +242,7 @@ share it and it survives a restart:
 
 | Table | Holds |
 |---|---|
-| `EASYSSF_PROCESSED_SET` | the SETs that were processed, and those claimed while their handlers run (`STATE`) |
+| `EASYSSF_PROCESSED_SET` | the SETs that were processed, and those claimed while their handlers run (`STATE`, `STATE_CHANGED_AT`) |
 | `EASYSSF_POLL_ACK` | with POLL delivery, the acknowledgements and error reports a poller owes its transmitter until a request carried them |
 
 ```properties
@@ -257,14 +257,17 @@ quarkus.openid-ssf.receiver.jdbc.ack-delete-batch-size=100 # acknowledgements re
 
 **Schema management.** With `initialize-schema=true` (the default) the tables are
 created on startup if they are missing, and a table of an earlier release gets
-the columns the current one needs (`STATE` of `EASYSSF_PROCESSED_SET`, added by
-easyssf 0.3.0). With `false` nothing is changed and the start fails naming the
+the columns the current one needs: `STATE` of `EASYSSF_PROCESSED_SET`, added by
+easyssf 0.3.0, and `PROCESSED_AT` renamed to `STATE_CHANGED_AT` by easyssf 0.4.0
+(`RENAME COLUMN`, which H2, PostgreSQL and MySQL 8 support). With `false`
+nothing is changed and the start fails naming the
 statements to run. An installation that owns its schema takes the scripts from
 `easyssf-receiver-jdbc`: `classpath:org/easyssf/receiver/jdbc/schema.sql` is the
 current schema for a fresh installation, and
 `classpath:org/easyssf/receiver/jdbc/migration/` holds one versioned script per
 release that changed the schema (`V0_1_0__processed_sets_and_revocations.sql`,
-`V0_3_0__dedup_state_and_poll_acks.sql`), named for Flyway and plain SQL for any
+`V0_3_0__dedup_state_and_poll_acks.sql`, `V0_4_0__state_changed_at.sql`), named for
+Flyway and plain SQL for any
 other tool. With `quarkus-flyway`, list the location next to the application's
 own and switch the startup changes off:
 
