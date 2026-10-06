@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.6.0 (unreleased)
+
 ## 0.5.0
 
 Two easyssf releases, with nothing to change in an application: easyssf 0.5.0
