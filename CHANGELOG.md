@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.4.0 (unreleased)
+
+POLL delivery that survives restarts and runs on several instances, through
+easyssf 0.3.0: the acknowledgements a poller owes its transmitter wait in a
+store, in the database with a datasource; long polling keeps one request
+outstanding; a SET is claimed while its handlers run so that two instances never
+acknowledge a SET one of them failed on. The JDBC schema gained a column and a
+table, with migration scripts and startup upgrades. Nothing changes for an
+application that delivers by PUSH without a datasource.
+
+### New
+
+- `SsfPollAckStore`: a handled SET is acknowledged with the request that follows,
+  and the acknowledgement waits in a store until a request carried it. In
+  memory by default; with `quarkus-agroal` and a datasource in the table
+  `EASYSSF_POLL_ACK` (`jdbc.ack-retention`, `jdbc.ack-delete-batch-size`), so a
+  SET handled right before a restart is acknowledged afterwards instead of being
+  delivered again. On shutdown the poller sends the pending acknowledgements
+  with a last request. An `SsfPollAckStore` bean of the application replaces the
+  built-in stores.
+- Long polling (RFC 8936, section 2.5): `poll.long-polling=true` keeps one
+  request outstanding that the transmitter holds for up to
+  `poll.long-polling-hold` (30s); a SET arrives at once instead of at the next
+  `poll.interval`. The request timeout of a long poll replaces
+  `http.read-timeout`. Both names are those of the Spring Boot starter.
+- `dedup.lease` (60s): how long a SET stays claimed while its handlers run. A
+  SET another instance is handling is left to it (PUSH answers `500`, POLL does
+  not acknowledge, metrics outcome `in_progress`); a claim older than the lease
+  counts as abandoned by a crashed instance.
+- Schema upgrades: with `jdbc.initialize-schema=true` a `PROCESSED_SET` table of
+  an earlier release gets the `STATE` column on startup; with `false` the start
+  fails naming the `ALTER TABLE` and the migration scripts of
+  `easyssf-receiver-jdbc` (`classpath:org/easyssf/receiver/jdbc/migration/`,
+  Flyway naming, plain SQL), which `quarkus.flyway.locations` can list.
+- The gauge `easyssf.receiver.poll.pending-acks` (tag `transmitter`), the health
+  details `polling` (`periodic`, `long`, `manual`) and `pendingAcks`, and a
+  "Polling" section of the Dev UI stream page (`pollStatus()`): mode, last poll,
+  error, pause, pending acknowledgements per transmitter.
+- Typed CAEP and RISC events from easyssf 0.3.0: `SsfCaepEventHandler` and
+  `SsfRiscEventHandler` dispatch the events of a SET to a method per event type,
+  `SsfEventContext.idempotencyKey()` is the key for the side effects of a
+  handler.
+
+### Changed
+
+- easyssf 0.3.0.
+- The poller of a transmitter runs on a virtual thread of its own named
+  `ssf-poller-<name>` (easyssf's loop, started and stopped by
+  `SsfPollScheduler`) instead of a Vert.x periodic timer. `poll.auto-start=false`
+  and `SsfPollScheduler.pollNow()` work as before. The pollers are stopped ahead
+  of the stream registrars on shutdown.
+- The table `EASYSSF_PROCESSED_SET` gained the column `STATE VARCHAR(16) NOT NULL`
+  (`'PROCESSED'` or `'IN_PROGRESS'`); existing tables need
+  `ALTER TABLE EASYSSF_PROCESSED_SET ADD STATE VARCHAR(16) DEFAULT 'PROCESSED' NOT NULL`
+  (the migration script `V0_3_0__dedup_state_and_poll_acks.sql`), applied on
+  startup with `jdbc.initialize-schema=true`. The schema has a third table,
+  `EASYSSF_POLL_ACK`, created on startup the same way; `schema.sql` of
+  `easyssf-receiver-jdbc` is the current schema for a fresh installation.
+- `jdbc.cleanup-interval` purges the acknowledgement table as well.
+- `SsfTransmitterFactory.poller(...)` and `builder(...)` take the
+  `SsfPollAckStore`.
+- No `synchronized` in the extension: locks are `ReentrantLock`, as the
+  extension runs on virtual threads.
+
 ## 0.3.0
 
 SCIM Events (RFC 9967) through easyssf 0.2.0: a SET that reports a change of a
