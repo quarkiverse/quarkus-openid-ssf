@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.0 (unreleased)
+## 0.6.0
 
 easyssf 0.6.0: a receiver has to know the audience of its SETs, and a handler
 that runs longer than `dedup.lease` keeps its SET. An application that
