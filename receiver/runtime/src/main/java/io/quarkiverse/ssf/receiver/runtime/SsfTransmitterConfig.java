@@ -58,8 +58,14 @@ public interface SsfTransmitterConfig {
 
     /**
      * Audience this receiver is known as at the transmitter. When set, every inbound SET
-     * must contain it in its {@code aud} claim. When not set and the stream is looked up
-     * or registered at startup, the audience of the stream is expected instead.
+     * must contain it in its {@code aud} claim. When not set, the audience of the stream
+     * the receiver registers or looks up on startup ({@code stream-management=RECEIVER},
+     * {@code stream-id}) is required instead, once the stream is known; until then a
+     * pushed SET is answered with {@code 503} and a polled one left unacknowledged, so
+     * that the transmitter delivers it again. One of the two, or
+     * {@code set-validation.allow-any-audience}, is required: a receiver that cannot know
+     * the audience of its SETs does not start, as it would accept SETs the transmitter
+     * issued for other receivers.
      */
     Optional<String> expectedAudience();
 
@@ -270,6 +276,17 @@ public interface SsfTransmitterConfig {
         /** Tolerated clock skew when checking that a SET was not issued in the future. */
         @WithDefault("60s")
         Duration clockSkew();
+
+        /**
+         * Accepts SETs whatever audience they carry when neither {@code expected-audience}
+         * is set nor a stream is registered or looked up ({@code stream-management},
+         * {@code stream-id}) that tells the audience, with a warning on startup. Off by
+         * default: a receiver without a known audience fails to start, because it would
+         * accept SETs the transmitter issued for other receivers. Only for a transmitter
+         * that sends no {@code aud}.
+         */
+        @WithDefault("false")
+        boolean allowAnyAudience();
     }
 
     interface Oauth2 {

@@ -164,9 +164,12 @@ quarkus.openid-ssf.receiver.transmitter-access-token=${TRANSMITTER_TOKEN}
 ```
 
 The audience of inbound SETs is taken from the stream the receiver looked up or
-registered; set `expected-audience` to check a fixed one instead. A transmitter
-issuer must use `https`, or `http` on `localhost`; `allow-insecure-http=true` lifts
-that for test setups.
+registered; set `expected-audience` to check a fixed one instead. One of the two
+is required: a receiver that cannot know the audience of its SETs does not start,
+as it would accept SETs the transmitter issued for other receivers. For a
+transmitter that sends no `aud`, `set-validation.allow-any-audience=true` lets it
+start anyway, with a warning. A transmitter issuer must use `https`, or `http` on
+`localhost`; `allow-insecure-http=true` lifts that for test setups.
 
 ### Several transmitters
 
@@ -197,9 +200,11 @@ With `stream-management=RECEIVER` the stream registrar of easyssf runs on a
 background virtual thread after startup: it lists the streams of the receiver
 at the transmitter, reuses one with the same delivery, updates one whose events
 differ, or creates one. The transmitter being down does not keep the application
-from starting; the registrar retries with exponential backoff (1s to 30s) and
-the push endpoint accepts SETs in the meantime. With a `stream-id` the stream is
-looked up the same way, to learn its audience and poll endpoint.
+from starting; the registrar retries with exponential backoff (1s to 30s). With
+a `stream-id` the stream is looked up the same way, to learn its audience and
+poll endpoint. Until the stream is known, the audience of a SET cannot be checked
+unless `expected-audience` is set: a pushed SET is answered with `503` and a
+polled one left unacknowledged, so the transmitter delivers it again.
 
 ```
 INFO  Created SSF stream d0200637-… (delivery urn:ietf:rfc:8935 https://my-app.example/ssf/push, events [CaepSessionRevoked], audience [my-receiver/d0200637-…])
@@ -219,8 +224,9 @@ A SET is *claimed* in the store before its handlers run and marked processed
 afterwards. Another instance that receives the same SET meanwhile neither
 handles nor acknowledges it (PUSH answers `500`, POLL leaves it unacknowledged,
 metrics outcome `in_progress`) and the transmitter delivers it again, so a
-handler failure on the first instance is never masked by the second. A claim
-older than `dedup.lease` counts as abandoned by an instance that crashed, and
+handler failure on the first instance is never masked by the second. The claim
+is renewed every third of `dedup.lease` while the handlers run; a claim that was
+not renewed for the lease counts as abandoned by an instance that crashed, and
 the SET is handled again. Processing is therefore *at least once*: handlers
 must be idempotent, and may run on another instance after a crash;
 `eventContext.idempotencyKey()` is the key for their side effects.
@@ -228,7 +234,7 @@ must be idempotent, and may run on another instance after a crash;
 ```properties
 quarkus.openid-ssf.receiver.dedup.enabled=true       # false if the handlers are idempotent anyway
 quarkus.openid-ssf.receiver.dedup.capacity=10000     # entries of the in-memory store
-quarkus.openid-ssf.receiver.dedup.lease=60s          # longer than the longest handler
+quarkus.openid-ssf.receiver.dedup.lease=60s          # a claim not renewed for this long is abandoned
 ```
 
 An `SsfJtiDedupStore` bean of the application (Redis, ...) replaces the built-in

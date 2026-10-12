@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Set;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.enterprise.inject.Disposes;
 import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
@@ -41,7 +42,9 @@ import io.quarkus.runtime.configuration.ConfigurationException;
  * <li>{@link SsfReceiverMetrics}: records nothing; {@code quarkus-micrometer} swaps in
  * the Micrometer implementation.</li>
  * <li>{@link SsfSetProcessor}: verifies, de-duplicates and dispatches SETs of every
- * transmitter to the {@link SsfEventHandler} beans.</li>
+ * transmitter to the {@link SsfEventHandler} beans. With a dedup store it renews the
+ * claim of a SET every third of {@code dedup.lease} while the handlers run, so a handler
+ * that runs longer than the lease keeps its SET.</li>
  * <li>{@link SsfPushHandler}: handles push requests, authenticating each transmitter
  * with its {@code push.expected-auth-header}.</li>
  * <li>{@link SsfTransmitters}: one {@link SsfTransmitter} per configured transmitter,
@@ -93,11 +96,20 @@ public class SsfReceiverProducers {
         SsfJtiDedupStore store = config.dedup().enabled() ? dedupStore.get() : null;
         SsfSetVerifier verifier = encodedSet -> transmitters.get().verifier().verify(encodedSet);
         SsfSetProcessor processor = new SsfSetProcessor(verifier, store, orderedHandlers(handlers));
+        if (store != null) {
+            // a handler may run longer than the lease: the claim is renewed meanwhile
+            processor.setClaimRenewal(config.dedup().lease().dividedBy(3));
+        }
         processor.setMetrics(metrics);
         processor.setStreamVerifications(issuer -> transmitters.get().streamVerification(issuer));
         processor.setUnderstoodSubjectMembers(Set.copyOf(config.understoodSubjectMembers()));
         processor.setCriticalSubjectMembers(issuer -> transmitters.get().criticalSubjectMembers(issuer));
         return processor;
+    }
+
+    /** Stops the thread that renews the claims, if any was started. */
+    void closeSetProcessor(@Disposes SsfSetProcessor processor) {
+        processor.close();
     }
 
     @Produces
