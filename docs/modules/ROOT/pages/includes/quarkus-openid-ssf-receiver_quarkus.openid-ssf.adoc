@@ -151,7 +151,7 @@ endif::add-copy-button-to-config-props[]
 
 [.description]
 --
-Audience this receiver is known as at the transmitter. When set, every inbound SET must contain it in its `aud` claim. When not set and the stream is looked up or registered at startup, the audience of the stream is expected instead.
+Audience this receiver is known as at the transmitter. When set, every inbound SET must contain it in its `aud` claim. When not set, the audience of the stream the receiver registers or looks up on startup (`stream-management=RECEIVER`, `stream-id`) is required instead, once the stream is known; until then a pushed SET is answered with `503` and a polled one left unacknowledged, so that the transmitter delivers it again. One of the two, or `set-validation.allow-any-audience`, is required: a receiver that cannot know the audience of its SETs does not start, as it would accept SETs the transmitter issued for other receivers.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -762,6 +762,32 @@ endif::add-copy-button-to-env-var[]
 |link:https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html[Duration] link:#duration-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the Duration format]]
 |`+++60S+++`
 
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-allow-any-audience]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-set-validation-allow-any-audience[`quarkus.openid-ssf.receiver.set-validation.allow-any-audience`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.set-validation.allow-any-audience+++[]
+endif::add-copy-button-to-config-props[]
+
+
+`quarkus.openid-ssf.receiver."transmitter-name".set-validation.allow-any-audience`
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver."transmitter-name".set-validation.allow-any-audience+++[]
+endif::add-copy-button-to-config-props[]
+
+[.description]
+--
+Accepts SETs whatever audience they carry when neither `expected-audience` is set nor a stream is registered or looked up (`stream-management`, `stream-id`) that tells the audience, with a warning on startup. Off by default: a receiver without a known audience fails to start, because it would accept SETs the transmitter issued for other receivers. Only for a transmitter that sends no `aud`.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_SET_VALIDATION_ALLOW_ANY_AUDIENCE+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_SET_VALIDATION_ALLOW_ANY_AUDIENCE+++`
+endif::add-copy-button-to-env-var[]
+--
+|boolean
+|`+++false+++`
+
 a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-token-endpoint]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-oauth2-token-endpoint[`quarkus.openid-ssf.receiver.oauth2.token-endpoint`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.oauth2.token-endpoint+++[]
@@ -1202,7 +1228,7 @@ endif::add-copy-button-to-config-props[]
 
 [.description]
 --
-How long a SET stays claimed while its handlers run. A SET is claimed in the store before the handlers run and marked processed afterwards; another instance that receives the same SET meanwhile neither handles nor acknowledges it, the transmitter delivers it again. A claim older than the lease counts as abandoned by an instance that crashed, and the SET is handled again. Set it longer than the longest handler.
+How long a SET counts as being handled by the instance that claimed it without renewing the claim, which it does every third of this time while its handlers run. A SET is claimed in the store before the handlers run and marked processed afterwards; another instance that receives the same SET meanwhile neither handles nor acknowledges it, the transmitter delivers it again. A claim that was not renewed for the lease counts as abandoned by an instance that crashed, and the SET is handled again.
 
 
 ifdef::add-copy-button-to-env-var[]

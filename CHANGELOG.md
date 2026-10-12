@@ -2,6 +2,38 @@
 
 ## 0.6.0 (unreleased)
 
+easyssf 0.6.0: a receiver has to know the audience of its SETs, and a handler
+that runs longer than `dedup.lease` keeps its SET. An application that
+configured neither `expected-audience` nor a stream of its own
+(`stream-management=TRANSMITTER` without `stream-id`) no longer starts until it
+names one of the two, or `set-validation.allow-any-audience=true`.
+
+### New
+
+- `set-validation.allow-any-audience` (`false`): accepts SETs whatever their
+  `aud` when neither `expected-audience` nor a registered or looked-up stream
+  tells the audience, with a warning on startup. Only for a transmitter that
+  sends no `aud`.
+- The claim of a SET is renewed every third of `dedup.lease` while its handlers
+  run (`SsfJtiDedupStore.renew`, `SsfSetProcessor.setClaimRenewal` of easyssf
+  0.6.0), so the lease no longer has to be longer than the longest handler. The
+  renewals run on a daemon thread the processor stops with the application.
+
+### Changed
+
+- **A receiver has to know the audience of its SETs.** Without
+  `expected-audience` and without a stream it registers or looks up
+  (`stream-management=RECEIVER`, the default, or `stream-id`) the start fails
+  instead of warning, naming the three ways out: the property, the stream, or
+  `set-validation.allow-any-audience=true`. Where the audience comes from the
+  stream, a SET that arrives before the stream is known is no longer accepted
+  unchecked: a pushed one is answered with `503`, a polled one left
+  unacknowledged, and the transmitter delivers it again. A stream without `aud`
+  rejects SETs as `invalid_audience` unless the option is set.
+- easyssf 0.6.0. Its conformance tests run `release-v5.3.2` of the OpenID
+  conformance suite, pinned by digest in `ConformanceSettings`, which
+  `receiver/conformance` follows; the `Conformance` workflow runs every night.
+
 ## 0.5.0
 
 Two easyssf releases, with nothing to change in an application: easyssf 0.5.0

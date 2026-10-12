@@ -68,8 +68,8 @@ reaches the receiver on the Docker host as `host.testcontainers.internal`.
 
 | System property / environment variable | Default | |
 |---|---|---|
-| `cts.suite.image` / `CTS_SUITE_IMAGE` | `registry.gitlab.com/openid/conformance-suite:latest` (the suite's current master build, see below) | the suite image |
-| `cts.suite.nginx-image` | `registry.gitlab.com/openid/conformance-suite/nginx:latest` | its nginx image |
+| `cts.suite.image` / `CTS_SUITE_IMAGE` | `registry.gitlab.com/openid/conformance-suite@sha256:…` (`release-v5.3.2`, pinned by digest, see below) | the suite image |
+| `cts.suite.nginx-image` | `registry.gitlab.com/openid/conformance-suite/nginx@sha256:…` (its nginx image, pinned by digest) | its nginx image |
 | `cts.suite.mongodb-image` | `mongo@sha256:…` (`9.0.2-noble`, pinned by digest; the suite itself runs 6.0.13 in production) | its MongoDB image |
 | `cts.suite.port` | `18443` | host port of the Testcontainers-started suite |
 | `cts.receiver.port` | `9444` | port of the receiver under test |
@@ -79,12 +79,13 @@ The properties can be given to Maven (`-Dcts.suite.image=...`), which passes the
 The defaults live in `ConformanceSettings` of `easyssf-test-conformance`, so this module follows
 easyssf when the suite images change.
 
-**Which suite.** The tests run the suite's current `latest` build to work around issues in the SSF
-tests of the last release (`release-v5.3.1`: fewer modules, and a race in its emulated transmitter
-that fails most poll modules). To run a build of your own, build the image from a checkout like
-the suite's CI does (`.gitlab-ci.yml`, job `build-image`: `mvn package`, then
-`docker build -t conformance-suite .`) and name it; Testcontainers uses images of the local Docker
-daemon as they are:
+**Which suite.** The tests run `release-v5.3.2` of the suite (2026-10-09), the first release with
+the SSF receiver tests as they are on the suite's master (the poll race of `release-v5.3.1`
+included), pinned by digest. To try the suite's master ahead of a release, name the registry's
+`latest` tag (`-Dcts.suite.image=registry.gitlab.com/openid/conformance-suite:latest`). To run a
+build of your own, build the image from a checkout like the suite's CI does (`.gitlab-ci.yml`, job
+`build-image`: `mvn package`, then `docker build -t conformance-suite .`) and name it;
+Testcontainers uses images of the local Docker daemon as they are:
 
 ```sh
 mvn -pl receiver/conformance -Pconformance verify -Dcts.suite.image=conformance-suite:master-949724883
@@ -94,7 +95,7 @@ The nginx image is independent of the suite version; the released one does for a
 suite.
 
 **CI.** The `Conformance` workflow (`.github/workflows/conformance.yml`) runs the four plans as
-separate jobs on demand (`workflow_dispatch`), optionally with other suite images.
+separate jobs every night and on demand (`workflow_dispatch`), optionally with other suite images.
 
 ## Manual runs
 

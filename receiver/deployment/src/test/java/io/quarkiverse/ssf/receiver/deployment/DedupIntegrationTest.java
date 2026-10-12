@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import jakarta.inject.Inject;
@@ -30,7 +33,8 @@ import io.restassured.http.ContentType;
 /**
  * The in-memory de-duplication store skips a SET that was processed before: the
  * transmitter still gets its {@code 202}, the handler is not invoked again. A claimed SET
- * is left alone until {@code dedup.lease} passed.
+ * is left alone until {@code dedup.lease} passed, and a handler that runs longer than the
+ * lease keeps its SET, as the claim is renewed meanwhile.
  */
 public class DedupIntegrationTest {
 
@@ -97,13 +101,46 @@ public class DedupIntegrationTest {
         assertEquals(SsfJtiDedupStore.State.NEW, dedupStore.claim(token).state(), "abandoned after the lease");
     }
 
+    @Test
+    @DisplayName("A handler that runs longer than dedup.lease keeps its SET: the claim is renewed meanwhile")
+    void claimIsRenewedWhileTheHandlerRuns() throws Exception {
+        String set = TestTransmitters.current().set("CaepSessionRevoked", SsfSubjectIdentifiers.opaque("user-slow"));
+        CountingHandler counting = (CountingHandler) handler;
+        counting.invocations.set(0);
+        counting.sleepMillis = 1500;
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            Future<?> first = executor.submit(() -> postSet(set));
+            // the lease of 1s has passed, the claim was renewed every third of it
+            Thread.sleep(1200);
+            // a second delivery finds the SET in progress, not abandoned: left to the redelivery
+            given().header("Content-Type", "application/secevent+jwt").body(set)
+                    .when().post("/ssf/push")
+                    .then().statusCode(500);
+            first.get();
+        } finally {
+            counting.sleepMillis = 0;
+        }
+        // the outcome of the handler was recorded with the renewed claim: processed, skipped
+        postSet(set);
+        assertEquals(1, counting.invocations.get(), "the handler ran once, the SET was never handled again");
+    }
+
     @Singleton
     public static class CountingHandler implements SsfEventHandler {
         final AtomicInteger invocations = new AtomicInteger();
 
+        volatile long sleepMillis;
+
         @Override
         public void handle(SsfEventContext eventContext) {
             invocations.incrementAndGet();
+            if (sleepMillis > 0) {
+                try {
+                    Thread.sleep(sleepMillis);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
         }
     }
 }

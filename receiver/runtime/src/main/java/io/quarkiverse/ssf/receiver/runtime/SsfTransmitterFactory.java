@@ -13,6 +13,7 @@ import org.easyssf.receiver.poll.SsfPollAckStore;
 import org.easyssf.receiver.poll.SsfPoller;
 import org.easyssf.receiver.set.NimbusSsfSetVerifier;
 import org.easyssf.receiver.set.SsfSetProcessor;
+import org.easyssf.receiver.set.SsfSetVerificationException;
 import org.easyssf.receiver.stream.SsfReceiverStream;
 import org.easyssf.receiver.stream.SsfStreamClient;
 import org.easyssf.receiver.stream.SsfStreamRegistrar;
@@ -21,6 +22,7 @@ import org.easyssf.receiver.transmitter.ClientCredentialsSsfTransmitterTokenProv
 import org.easyssf.receiver.transmitter.SsfTransmitter;
 import org.easyssf.receiver.transmitter.SsfTransmitterMetadataResolver;
 import org.easyssf.receiver.transmitter.SsfTransmitterTokenProvider;
+import org.easyssf.receiver.transmitter.SsfTransmitterUnavailableException;
 import org.easyssf.receiver.transmitter.SsfTransmitterUriPolicy;
 import org.jboss.logging.Logger;
 
@@ -84,6 +86,18 @@ public final class SsfTransmitterFactory {
         return resolver;
     }
 
+    /**
+     * The verifier of the transmitter. The audience it requires is the configured
+     * {@code expected-audience}; without one, the audience of the stream once it is
+     * registered or looked up, and SETs are left unverified
+     * ({@link SsfTransmitterUnavailableException}: pushed SETs are answered with 503,
+     * polled ones left unacknowledged, so the transmitter delivers them again) until it
+     * is; without a stream, any audience, which only
+     * {@code set-validation.allow-any-audience} allows.
+     *
+     * @throws ConfigurationException if the audience of the SETs cannot be known, or an
+     *         algorithm or the JWK Set URL is not acceptable
+     */
     public static NimbusSsfSetVerifier verifier(String name, SsfTransmitterConfig config, SsfHttpClient httpClient,
             SsfTransmitterMetadataResolver metadataResolver, SsfReceiverStream receiverStream) {
         SsfTransmitterConfig.SetValidation validation = config.setValidation();
@@ -92,11 +106,17 @@ public final class SsfTransmitterFactory {
         if (config.expectedAudience().filter(aud -> !aud.isBlank()).isPresent()) {
             verifier.setExpectedAudience(config.expectedAudience().get());
         } else if (registersStream(config)) {
-            // the transmitter tells the audience of the stream
-            verifier.setExpectedAudiences(receiverStream::getAudience);
+            verifier.setExpectedAudiences(streamAudience(name, config, receiverStream));
+        } else if (validation.allowAnyAudience()) {
+            LOG.warnf("%sset-validation.allow-any-audience is on and %sexpected-audience is not set, SETs that the "
+                    + "SSF transmitter %s issued for other receivers are accepted as well", prefix(name), prefix(name),
+                    describe(name, issuer(name, config)));
         } else {
-            LOG.warnf("%sexpected-audience is not set, SETs that the SSF transmitter %s issued for other receivers "
-                    + "are accepted as well", prefix(name), describe(name, issuer(name, config)));
+            throw new ConfigurationException(prefix(name) + "expected-audience: the audience of the SETs must be "
+                    + "known. Set " + prefix(name) + "expected-audience, or let the receiver look the stream up ("
+                    + prefix(name) + "stream-management=RECEIVER or " + prefix(name) + "stream-id), or set "
+                    + prefix(name) + "set-validation.allow-any-audience=true to accept SETs the transmitter issued "
+                    + "for other receivers as well");
         }
         try {
             verifier.setAcceptedAlgorithms(validation.acceptedAlgorithms());
@@ -247,6 +267,32 @@ public final class SsfTransmitterFactory {
                 .poller(poller(name, config, httpClient, tokenProvider, processor, receiverStream, metrics, ackStore),
                         false)
                 .pushAuthorizationHeader(config.push().expectedAuthHeader().orElse(null));
+    }
+
+    /**
+     * The audiences of the SETs of a registered or looked-up stream: the transmitter
+     * tells them with the stream configuration (SSF 1.0, section 8.1.1, {@code aud}).
+     * Until the stream is known a SET cannot be checked, so it is left to the redelivery
+     * instead of being accepted blindly; a stream without {@code aud} accepts any
+     * audience only with {@code set-validation.allow-any-audience}.
+     */
+    private static Supplier<List<String>> streamAudience(String name, SsfTransmitterConfig config,
+            SsfReceiverStream receiverStream) {
+        boolean anyAudience = config.setValidation().allowAnyAudience();
+        String transmitter = describe(name, issuer(name, config));
+        return () -> {
+            if (receiverStream.getConfiguration().isEmpty()) {
+                throw new SsfTransmitterUnavailableException("The stream at " + transmitter
+                        + " is not registered yet, so the audience of SETs cannot be checked", null);
+            }
+            List<String> audience = receiverStream.getAudience();
+            if (audience.isEmpty() && !anyAudience) {
+                throw new SsfSetVerificationException(SsfSetVerificationException.INVALID_AUDIENCE,
+                        "The stream at " + transmitter + " has no audience (aud), set " + prefix(name)
+                                + "expected-audience or " + prefix(name) + "set-validation.allow-any-audience");
+            }
+            return audience;
+        };
     }
 
     /** Whether the stream is looked up or managed on startup. */

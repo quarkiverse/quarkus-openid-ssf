@@ -168,12 +168,13 @@ public interface SsfReceiverConfig {
         Duration retention();
 
         /**
-         * How long a SET stays claimed while its handlers run. A SET is claimed in the
-         * store before the handlers run and marked processed afterwards; another
-         * instance that receives the same SET meanwhile neither handles nor acknowledges
-         * it, the transmitter delivers it again. A claim older than the lease counts as
-         * abandoned by an instance that crashed, and the SET is handled again. Set it
-         * longer than the longest handler.
+         * How long a SET counts as being handled by the instance that claimed it without
+         * renewing the claim, which it does every third of this time while its handlers
+         * run. A SET is claimed in the store before the handlers run and marked processed
+         * afterwards; another instance that receives the same SET meanwhile neither
+         * handles nor acknowledges it, the transmitter delivers it again. A claim that was
+         * not renewed for the lease counts as abandoned by an instance that crashed, and
+         * the SET is handled again.
          */
         @WithDefault("60s")
         Duration lease();
