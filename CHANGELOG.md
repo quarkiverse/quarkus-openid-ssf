@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.0 (unreleased)
+
+### Fixed
+
+- The conformance tests start again on GitHub's current Ubuntu runners: the
+  suite's MongoDB is 9.0.4 now, set in `receiver/conformance/pom.xml` over the
+  9.0.2 easyssf 0.6.0 names. MongoDB 8.0 and newer exit at startup on a Linux
+  kernel from 6.19 up to 7.0.13, and before 9.0.4 they took Ubuntu's 7.0 kernels
+  for 7.0.0 (SERVER-121912, SERVER-131779), so the suite found no database and
+  the nightly run failed since the runner image of 2026-10-18.
+
 ## 0.6.0
 
 easyssf 0.6.0: a receiver has to know the audience of its SETs, and a handler

@@ -70,14 +70,17 @@ reaches the receiver on the Docker host as `host.testcontainers.internal`.
 |---|---|---|
 | `cts.suite.image` / `CTS_SUITE_IMAGE` | `registry.gitlab.com/openid/conformance-suite@sha256:…` (`release-v5.3.2`, pinned by digest, see below) | the suite image |
 | `cts.suite.nginx-image` | `registry.gitlab.com/openid/conformance-suite/nginx@sha256:…` (its nginx image, pinned by digest) | its nginx image |
-| `cts.suite.mongodb-image` | `mongo@sha256:…` (`9.0.2-noble`, pinned by digest; the suite itself runs 6.0.13 in production) | its MongoDB image |
+| `cts.suite.mongodb-image` | `mongo@sha256:…` (`9.0.4`, pinned by digest in this module's `pom.xml`; the suite itself runs 6.0.13 in production, and easyssf's 9.0.2 does not start on current Ubuntu kernels) | its MongoDB image |
 | `cts.suite.port` | `18443` | host port of the Testcontainers-started suite |
 | `cts.receiver.port` | `9444` | port of the receiver under test |
 | `cts.receiver.push-url` | `https://<host as seen from the suite>:<receiver port>/ssf/push` | the push URL the receiver registers |
 
 The properties can be given to Maven (`-Dcts.suite.image=...`), which passes them on to the tests.
 The defaults live in `ConformanceSettings` of `easyssf-test-conformance`, so this module follows
-easyssf when the suite images change.
+easyssf when the suite images change. The MongoDB image is the exception for now: easyssf 0.6.0
+names 9.0.2, which exits at startup on the kernel of GitHub's Ubuntu runners (MongoDB 8.0 and newer
+refuse a Linux kernel from 6.19 up to 7.0.13, SERVER-121912, and before 9.0.4 they took Ubuntu's 7.0
+kernels for 7.0.0, SERVER-131779), so `pom.xml` sets 9.0.4 until an easyssf release does.
 
 **Which suite.** The tests run `release-v5.3.2` of the suite (2026-10-09), the first release with
 the SSF receiver tests as they are on the suite's master (the poll race of `release-v5.3.1`
