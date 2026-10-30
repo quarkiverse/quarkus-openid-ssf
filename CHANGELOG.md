@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.8.0 (unreleased)
+
 ## 0.7.0
 
 easyssf 0.7.0: the receiver is hardened after a review of the Go and Python
