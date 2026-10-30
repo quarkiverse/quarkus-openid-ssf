@@ -13,6 +13,7 @@ import io.quarkus.runtime.annotations.ConfigDocMapKey;
 import io.quarkus.runtime.annotations.ConfigDocSection;
 import io.quarkus.runtime.annotations.ConfigPhase;
 import io.quarkus.runtime.annotations.ConfigRoot;
+import io.quarkus.runtime.configuration.MemorySize;
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
 import io.smallrye.config.WithDefaults;
@@ -141,6 +142,14 @@ public interface SsfReceiverConfig {
          * HTTP client ({@code Java-http-client/<version>}) is sent when not set.
          */
         Optional<String> userAgent();
+
+        /**
+         * The largest response body accepted from a transmitter (metadata, JWK Set, stream
+         * configuration, poll response); a larger response fails the call as if the
+         * transmitter were unavailable instead of being buffered.
+         */
+        @WithDefault("4M")
+        MemorySize maxResponseSize();
     }
 
     interface Dedup {

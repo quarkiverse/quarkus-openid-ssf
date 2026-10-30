@@ -48,8 +48,8 @@ public interface SsfTransmitterConfig {
     Optional<URI> transmitterJwksUrl();
 
     /**
-     * Whether the transmitter issuer and the endpoints it publishes may use plain
-     * {@code http} on hosts other than loopback addresses. For test setups only, SSF
+     * Whether the transmitter issuer, the endpoints it publishes and the poll endpoint
+     * may use plain {@code http} on hosts other than loopback addresses. For test setups only, SSF
      * requires {@code https}: the metadata of the transmitter decides where keys come
      * from, and without TLS anyone on the path can change it.
      */
@@ -157,6 +157,8 @@ public interface SsfTransmitterConfig {
         /**
          * Poll endpoint of the transmitter. Taken from the configuration of the stream
          * when not set, which needs the stream to be looked up or managed on startup.
+         * Either way it must use {@code https} ({@code http} on loopback addresses only,
+         * or with {@code allow-insecure-http}), as the access token is sent to it.
          */
         Optional<URI> endpointUrl();
 
@@ -232,7 +234,10 @@ public interface SsfTransmitterConfig {
         /**
          * Whether the stream managed by the receiver is deleted at the transmitter when
          * the application stops, so that short-lived receivers (dev mode, tests) do not
-         * leave streams behind. {@code false} keeps the stream across restarts.
+         * leave streams behind. {@code false} keeps the stream across restarts. For a
+         * single instance only: several instances share the stream, so the first one to
+         * stop deletes it for the others, and the next one to start creates a new stream
+         * with a new audience.
          */
         @WithDefault("false")
         boolean deleteOnShutdown();

@@ -73,6 +73,7 @@ public class SsfReceiverProducers {
         SsfReceiverConfig.Http http = config.http();
         JdkSsfHttpClient httpClient = new JdkSsfHttpClient(http.connectTimeout(), http.readTimeout());
         httpClient.setUserAgent(http.userAgent().orElse(null));
+        httpClient.setMaxResponseSize(http.maxResponseSize().asLongValue());
         return httpClient;
     }
 

@@ -2,7 +2,39 @@
 
 ## 0.7.0 (unreleased)
 
+easyssf 0.7.0 (currently built against 0.7.0-SNAPSHOT): the receiver is
+hardened after a review of the Go and Python ports of easyssf.
+
+### Security
+
+- The poll endpoint is held to the URI policy of the transmitter before the
+  access token is sent to it: `https`, or `http` on loopback addresses only,
+  unless `allow-insecure-http` is set. A configured `poll.endpoint-url` that
+  breaks the rule fails the start; one taken from the stream is checked before
+  every request (`SsfPoller.setUriPolicy`).
+- A host name that merely starts with `127.`, such as `127.attacker.example`, no
+  longer counts as a loopback address for plain `http`; only `localhost` and
+  names under it, `127.0.0.0/8` and `::1` do.
+- Response bodies read from a transmitter are bounded by the new
+  `http.max-response-size` (`4M`); a larger response fails the call as if the
+  transmitter were unavailable instead of being buffered.
+
+### Changed
+
+- The issuer of every stream configuration the transmitter returns is checked,
+  not only of a created one (`SsfStreamIssuerMismatchException`).
+- `receiver-managed.delete-on-shutdown` is documented as being for a single
+  instance only, and the docs explain how several instances share a stream.
+
 ### Fixed
+
+- A polled SET listed under a key other than its `jti` is reported as
+  `invalid_request` instead of being handled.
+- Stopping and starting the poller or the stream registrar again no longer
+  leaves a second polling thread or an orphaned stream behind; a registration
+  that completes after the stop publishes nothing.
+- The `easyssf.receiver.poll.pending-acks` gauge no longer turns `NaN` after a
+  garbage collection.
 
 - The conformance tests start again on GitHub's current Ubuntu runners: the
   suite's MongoDB is 9.0.4 now, set in `receiver/conformance/pom.xml` over the

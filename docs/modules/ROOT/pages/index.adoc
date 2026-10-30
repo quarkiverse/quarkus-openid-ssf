@@ -43,7 +43,14 @@ Micrometer, a health check, JDBC, the Dev UI and native image support.
   with a 2048-bit minimum RSA key by default (CAEP Interop Profile), tunable.
 * Manages the stream of the receiver: `RECEIVER` (default) looks it up at the
   transmitter on startup and creates or updates it, with retries in the
-  background; `TRANSMITTER` uses a stream an operator created.
+  background; `TRANSMITTER` uses a stream an operator created. Several
+  instances share one stream, as each finds it on startup. Instances that start
+  at the same time against a transmitter without a stream may each create one,
+  unless the transmitter allows a single stream per receiver (Keycloak does);
+  every event is then delivered once per stream, with a `jti` of its own, which
+  the de-duplication cannot tell apart. Start one instance first, or let the
+  transmitter manage the stream. `receiver-managed.delete-on-shutdown` is for a
+  single instance only.
 * Receives from several transmitters (`quarkus.openid-ssf.receiver.<name>.*`),
   selected by the issuer of a SET.
 * Exposes the stream management API (SSF section 8.1) through

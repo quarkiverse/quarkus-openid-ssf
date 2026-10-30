@@ -23,6 +23,9 @@ import org.easyssf.core.stream.SsfStreamConfiguration;
 import org.easyssf.core.stream.SsfStreamStatus;
 import org.easyssf.receiver.event.SsfEventContext;
 import org.easyssf.receiver.event.SsfEventHandler;
+import org.easyssf.receiver.http.JdkSsfHttpClient;
+import org.easyssf.receiver.http.SsfHttpClient;
+import org.easyssf.receiver.http.SsfHttpResponse;
 import org.easyssf.receiver.transmitter.SsfTransmitter;
 import org.easyssf.receiver.transmitter.SsfTransmitters;
 import org.easyssf.test.TestTransmitter;
@@ -70,6 +73,9 @@ public class SsfReceiverSmokeTest {
 
     @Inject
     SsfTransmitters transmitters;
+
+    @Inject
+    SsfHttpClient httpClient;
 
     @BeforeAll
     static void registerSeceventEncoder() {
@@ -181,6 +187,11 @@ public class SsfReceiverSmokeTest {
         assertThat(metadata.issuer(), equalTo(TestTransmitters.current().issuer()));
         assertThat(metadata.jwksUri().toString(), equalTo(TestTransmitters.current().jwksUri()));
         assertThat(metadata.statusEndpoint(), is(notNullValue()));
+    }
+
+    @Test
+    void responseSizeIsBoundedByDefault() {
+        assertEquals(SsfHttpResponse.DEFAULT_MAX_BODY_SIZE, ((JdkSsfHttpClient) httpClient).getMaxResponseSize());
     }
 
     @Singleton
