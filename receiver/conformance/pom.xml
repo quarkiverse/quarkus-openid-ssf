@@ -22,14 +22,7 @@
         <!-- how the tests start the suite and expose the receiver, see ConformanceSettings; empty: its defaults -->
         <cts.suite.image />
         <cts.suite.nginx-image />
-        <!--
-            mongo:9.0.4, pinned by digest. easyssf 0.6.0 defaults to 9.0.2, which refuses to start
-            on the kernel of GitHub's Ubuntu runners since October 2026 (MongoDB 8.0 and newer exit
-            on a Linux kernel from 6.19 up to 7.0.13, SERVER-121912, and before 9.0.4 they took
-            Ubuntu's 7.0 kernels for 7.0.0, SERVER-131779). Drop once easyssf's default is 9.0.4 or
-            newer (easyssf/easyssf#54, gh-34).
-        -->
-        <cts.suite.mongodb-image>mongo@sha256:dc28ed5a9d0fc616903c3f463bb1e53b92b49f441721b91926e87d90bf957ce8</cts.suite.mongodb-image>
+        <cts.suite.mongodb-image />
         <cts.suite.port />
         <cts.receiver.port />
         <cts.receiver.push-url />
