@@ -224,6 +224,7 @@ public final class SsfTransmitterFactory {
         SsfTransmitterConfig.Poll poll = config.poll();
         SsfPoller poller = new SsfPoller(httpClient, tokenProvider, pollEndpoint(name, config, receiverStream),
                 processor);
+        poller.setUriPolicy(uriPolicy(config));
         poller.setTransmitter(issuer(name, config));
         poller.setMetrics((metrics != null) ? metrics : SsfReceiverMetrics.NOOP);
         if (ackStore != null) {
@@ -324,6 +325,11 @@ public final class SsfTransmitterFactory {
             SsfReceiverStream receiverStream) {
         URI configured = config.poll().endpointUrl().orElse(null);
         if (configured != null) {
+            try {
+                uriPolicy(config).checkEndpoint(configured, "The poll endpoint");
+            } catch (IllegalArgumentException e) {
+                throw new ConfigurationException(prefix(name) + "poll.endpoint-url: " + e.getMessage(), e);
+            }
             return () -> configured;
         }
         if (!registersStream(config)) {

@@ -125,7 +125,7 @@ endif::add-copy-button-to-config-props[]
 
 [.description]
 --
-Whether the transmitter issuer and the endpoints it publishes may use plain `http` on hosts other than loopback addresses. For test setups only, SSF requires `https`: the metadata of the transmitter decides where keys come from, and without TLS anyone on the path can change it.
+Whether the transmitter issuer, the endpoints it publishes and the poll endpoint may use plain `http` on hosts other than loopback addresses. For test setups only, SSF requires `https`: the metadata of the transmitter decides where keys come from, and without TLS anyone on the path can change it.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -359,7 +359,7 @@ endif::add-copy-button-to-config-props[]
 
 [.description]
 --
-Poll endpoint of the transmitter. Taken from the configuration of the stream when not set, which needs the stream to be looked up or managed on startup.
+Poll endpoint of the transmitter. Taken from the configuration of the stream when not set, which needs the stream to be looked up or managed on startup. Either way it must use `https` (`http` on loopback addresses only, or with `allow-insecure-http`), as the access token is sent to it.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -593,7 +593,7 @@ endif::add-copy-button-to-config-props[]
 
 [.description]
 --
-Whether the stream managed by the receiver is deleted at the transmitter when the application stops, so that short-lived receivers (dev mode, tests) do not leave streams behind. `false` keeps the stream across restarts.
+Whether the stream managed by the receiver is deleted at the transmitter when the application stops, so that short-lived receivers (dev mode, tests) do not leave streams behind. `false` keeps the stream across restarts. For a single instance only: several instances share the stream, so the first one to stop deletes it for the others, and the next one to start creates a new stream with a new audience.
 
 
 ifdef::add-copy-button-to-env-var[]
@@ -1157,6 +1157,27 @@ endif::add-copy-button-to-env-var[]
 |string
 |
 
+a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-max-response-size]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-http-max-response-size[`quarkus.openid-ssf.receiver.http.max-response-size`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.openid-ssf.receiver.http.max-response-size+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+The largest response body accepted from a transmitter (metadata, JWK Set, stream configuration, poll response); a larger response fails the call as if the transmitter were unavailable instead of being buffered.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_OPENID_SSF_RECEIVER_HTTP_MAX_RESPONSE_SIZE+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_OPENID_SSF_RECEIVER_HTTP_MAX_RESPONSE_SIZE+++`
+endif::add-copy-button-to-env-var[]
+--
+|MemorySize link:#memory-size-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf[icon:question-circle[title=More information about the MemorySize format]]
+|`+++4M+++`
+
 a| [[quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-enabled]] [.property-path]##link:#quarkus-openid-ssf-receiver_quarkus-openid-ssf-receiver-dedup-enabled[`quarkus.openid-ssf.receiver.dedup.enabled`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++quarkus.openid-ssf.receiver.dedup.enabled+++[]
@@ -1388,3 +1409,13 @@ In other cases, the simplified format is translated to the `java.time.Duration` 
 * If the value is a number followed by `d`, it is prefixed with `P`.
 ====
 endif::no-duration-note[]
+ifndef::no-memory-size-note[]
+[NOTE]
+[id=memory-size-note-anchor-quarkus-openid-ssf-receiver_quarkus-openid-ssf]
+.About the MemorySize format
+====
+A size configuration option recognizes strings in this format (shown as a regular expression): `[0-9]+[KkMmGgTtPpEeZzYy]?`.
+
+If no suffix is given, assume bytes.
+====
+endif::no-memory-size-note[]
