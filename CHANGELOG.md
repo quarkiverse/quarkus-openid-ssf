@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.0 (unreleased)
+## 0.7.0
 
 easyssf 0.7.0: the receiver is hardened after a review of the Go and Python
 ports of easyssf.
@@ -36,9 +36,9 @@ ports of easyssf.
 - The `easyssf.receiver.poll.pending-acks` gauge no longer turns `NaN` after a
   garbage collection.
 - The conformance tests start again on GitHub's current Ubuntu runners: the
-  suite's MongoDB is 9.0.4 now, the default of easyssf 0.7.0. MongoDB 8.0 and newer exit at startup on a Linux
-  kernel from 6.19 up to 7.0.13, and before 9.0.4 they took Ubuntu's 7.0 kernels
-  for 7.0.0 (SERVER-121912, SERVER-131779), so the suite found no database and
+  suite's MongoDB is 9.0.4 now, the default of easyssf 0.7.0. MongoDB 8.0 and
+  newer exit at startup on a Linux kernel from 6.19 up to 7.0.13, and before
+  9.0.4 they took Ubuntu's 7.0 kernels for 7.0.0 (SERVER-121912, SERVER-131779), so the suite found no database and
   the nightly run failed since the runner image of 2026-10-18.
 
 ## 0.6.0
